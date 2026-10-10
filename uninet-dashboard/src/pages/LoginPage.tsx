@@ -11,6 +11,7 @@ export const LoginPage: React.FC = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +42,11 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await login(trimmedEmail, password);
+      const res = await login({
+        email: trimmedEmail,
+        password,
+        rememberMe,
+      });
       if (res.success && res.user) {
         const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
         const target = from || roleDefaultRoutes[res.user.role];
@@ -68,7 +73,6 @@ export const LoginPage: React.FC = () => {
         {/* Brand Card */}
         <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/80 transition-all duration-300">
           {/* Logo & Header */}
-          {/* Logo & Header */}
           <div className="text-center mb-8">
             <div className="flex justify-center items-center mb-5">
               <img
@@ -82,9 +86,7 @@ export const LoginPage: React.FC = () => {
               UniNet Dashboard
             </h1>
 
-            <p className="text-sm text-slate-500 mt-2 font-medium">
-              Nền tảng hợp tác nhóm và kết nối cơ hội nghề nghiệp cho sinh viên
-            </p>
+
           </div>
           {/* Alert: Error */}
           {errorMessage && (
@@ -150,24 +152,12 @@ export const LoginPage: React.FC = () => {
 
             {/* Password Field */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="password"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-700"
-                >
-                  Mật khẩu
-                </label>
-                <a
-                  href="#forgot"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Tính năng khôi phục mật khẩu đang được phát triển.');
-                  }}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                >
-                  Quên mật khẩu?
-                </a>
-              </div>
+              <label
+                htmlFor="password"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2"
+              >
+                Mật khẩu
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <svg
@@ -240,6 +230,29 @@ export const LoginPage: React.FC = () => {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="font-medium text-slate-600">Ghi nhớ đăng nhập</span>
+              </label>
+              <a
+                href="#forgot"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('Tính năng khôi phục mật khẩu đang được phát triển.');
+                }}
+                className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+              >
+                Quên mật khẩu?
+              </a>
             </div>
 
             {/* Submit Button */}

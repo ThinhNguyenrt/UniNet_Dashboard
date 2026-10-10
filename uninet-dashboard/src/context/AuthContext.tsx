@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, UserRole, AuthContextType } from '../types/auth';
+import type {
+  User,
+  UserRole,
+  AuthContextType,
+  LoginRequest,
+  LoginResult,
+} from '../types/auth';
 import { mockAccounts } from '../data/mockAccount';
+import { authService } from '../services/auth.service';
+import { getApiErrorMessage } from '../services/api';
 
 const AUTH_STORAGE_KEY = 'uninet_auth_user';
 
@@ -13,23 +21,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Khôi phục phiên làm việc từ localStorage khi F5 hoặc mở tab mới
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as User;
-        setCurrentUser(parsed);
+      const user = authService.getStoredUser();
+      if (user) {
+        setCurrentUser(user);
       }
     } catch (e) {
       console.error('Lỗi khi đọc phiên đăng nhập:', e);
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      authService.clearAuthData();
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  /**
+   * Đăng nhập thông qua API thực tế: POST /auth/login
+   */
   const login = async (
+    emailOrParams: string | LoginRequest,
+    passwordArg?: string,
+    rememberMeArg?: boolean
+  ): Promise<LoginResult> => {
+    const params: LoginRequest =
+      typeof emailOrParams === 'string'
+        ? {
+            email: emailOrParams.trim(),
+            password: passwordArg || '',
+            rememberMe: rememberMeArg ?? true,
+          }
+        : emailOrParams;
+
+    try {
+      // 1. Gọi backend API đăng nhập
+      const response = await authService.login(params);
+
+      // 2. Chuẩn hóa dữ liệu trả về theo chuẩn User dashboard
+      const user = authService.transformLoginResponseToUser(response);
+
+      // 3. Lưu trữ accessToken, refreshToken và thông tin user
+      authService.saveAuthData(response, user);
+      setCurrentUser(user);
+
+      return {
+        success: true,
+        user,
+        data: response,
+      };
+    } catch (error) {
+      const errorMsg = getApiErrorMessage(
+        error,
+        'Email hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại.'
+      );
+      return {
+        success: false,
+        error: errorMsg,
+      };
+    }
+  };
+
+  /**
+   * Đăng nhập thử nghiệm bằng mock data (được giữ lại phục vụ dev/test)
+   */
+  const loginWithMock = async (
     email: string,
     password: string
-  ): Promise<{ success: boolean; error?: string; user?: User }> => {
+  ): Promise<LoginResult> => {
     const trimmedEmail = email.trim().toLowerCase();
     const matched = mockAccounts.find(
       (acc) => acc.email.toLowerCase() === trimmedEmail && acc.password === password
@@ -53,16 +108,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return {
       success: false,
-      error: 'Email hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại.',
+      error: 'Email hoặc mật khẩu không chính xác trong mock data!',
     };
   };
 
+  /**
+   * Đăng xuất: xóa token và phiên làm việc
+   */
   const logout = () => {
+    authService.clearAuthData();
     setCurrentUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
-  // Hỗ trợ chuyển đổi nhanh vai trò khi kiểm thử giao diện
+  /**
+   * Hỗ trợ chuyển đổi nhanh vai trò khi kiểm thử giao diện
+   */
   const switchRoleForDev = (targetRole: UserRole) => {
     const sample = mockAccounts.find((acc) => acc.role === targetRole);
     if (sample) {
@@ -73,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: sample.role,
         roleName: sample.roleName,
         description: sample.description,
+        avatar: sample.avatar,
       };
       setCurrentUser(user);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
@@ -88,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         switchRoleForDev,
+        loginWithMock,
       }}
     >
       {children}
@@ -102,3 +164,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
