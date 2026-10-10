@@ -68,22 +68,24 @@ export const LoginPage: React.FC = () => {
         {/* Brand Card */}
         <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-200/80 transition-all duration-300">
           {/* Logo & Header */}
+          {/* Logo & Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex p-3 bg-white rounded-3xl shadow-md border border-slate-100 mb-4 hover:shadow-lg transition-shadow">
+            <div className="flex justify-center items-center mb-5">
               <img
                 src={logoImg}
                 alt="UniNet Logo"
-                className="w-32 h-32 sm:w-40 sm:h-40 object-contain rounded-2xl"
+                className="w-auto h-16 sm:h-20 max-w-[220px] object-contain"
               />
             </div>
+
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
               UniNet Dashboard
             </h1>
-            <p className="text-sm text-slate-500 mt-1.5 font-medium">
-              Hệ thống quản trị & vận hành mạng lưới đại học
+
+            <p className="text-sm text-slate-500 mt-2 font-medium">
+              Nền tảng hợp tác nhóm và kết nối cơ hội nghề nghiệp cho sinh viên
             </p>
           </div>
-
           {/* Alert: Error */}
           {errorMessage && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-700 text-sm shadow-sm">
