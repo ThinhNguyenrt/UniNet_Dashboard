@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { roleDefaultRoutes } from '../data/navigation';
 
 export const UnauthorizedPage: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const location = useLocation();
   const attemptedPath = (location.state as { attemptedPath?: string })?.attemptedPath;
   const targetRoute = currentUser ? roleDefaultRoutes[currentUser.role] : '/login';
@@ -32,13 +32,25 @@ export const UnauthorizedPage: React.FC = () => {
           </div>
         )}
 
-        <Link
-          to={targetRoute}
-          className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition shadow-md shadow-blue-500/20"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Về khu vực làm việc của bạn
-        </Link>
+        <div className="space-y-2.5">
+          <Link
+            to={targetRoute}
+            className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition shadow-md shadow-blue-500/20"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Về khu vực làm việc của bạn
+          </Link>
+
+          {currentUser && (
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition"
+            >
+              Đăng nhập bằng tài khoản khác
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
