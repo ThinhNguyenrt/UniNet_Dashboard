@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logoImg from '../assets/logo.jpg';
 import { useAuth } from '../context/AuthContext';
-import { roleDefaultRoutes } from '../data/navigation';
+import { roleDefaultRoutes, getRedirectPathForRole } from '../data/navigation';
 
 export const LoginPage: React.FC = () => {
   const { login, isAuthenticated, currentUser } = useAuth();
@@ -20,7 +20,7 @@ export const LoginPage: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && currentUser) {
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-      const destination = from || roleDefaultRoutes[currentUser.role];
+      const destination = getRedirectPathForRole(currentUser.role, from);
       navigate(destination, { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate, location]);
@@ -49,7 +49,7 @@ export const LoginPage: React.FC = () => {
       });
       if (res.success && res.user) {
         const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-        const target = from || roleDefaultRoutes[res.user.role];
+        const target = getRedirectPathForRole(res.user.role, from);
         navigate(target, { replace: true });
       } else {
         setErrorMessage(res.error || 'Email hoặc mật khẩu không chính xác.');
