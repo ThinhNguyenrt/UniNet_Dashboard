@@ -1,5 +1,9 @@
 import axios, { AxiosError } from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 import type { ApiErrorResponse } from '../types/auth';
+import { dashboardSession, refreshDashboardSession } from './dashboard-session';
+
+type SessionRequest = InternalAxiosRequestConfig & { sessionGeneration?: string; sessionAccessToken?: string; retried?: boolean };
 
 // Lấy base URL từ biến môi trường Vite (.env) và chuẩn hóa loại bỏ khoảng trắng / slash thừa
 const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
@@ -23,6 +27,10 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
+    const session = dashboardSession();
+    const request = config as SessionRequest;
+    request.sessionGeneration = session?.generation;
+    request.sessionAccessToken = token || undefined;
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -34,9 +42,16 @@ apiClient.interceptors.request.use(
 // Response Interceptor: Xử lý tập trung response & error
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    // Có thể xử lý tự động refresh token hoặc redirect login khi 401 tại đây nếu cần
-    return Promise.reject(error);
+  async (error: AxiosError) => {
+    const request = error.config as SessionRequest | undefined;
+    if (error.response?.status !== 401 || !request || request.retried || /\/?auth\//.test(request.url || '')) return Promise.reject(error);
+    const session = dashboardSession();
+    if (!session || session.generation !== request.sessionGeneration) return Promise.reject(error);
+    request.retried = true;
+    const token = session.accessToken !== request.sessionAccessToken ? session.accessToken : await refreshDashboardSession(session, API_BASE_URL);
+    if (dashboardSession()?.generation !== session.generation) throw new Error('Phiên đăng nhập đã thay đổi.');
+    request.headers.Authorization = `Bearer ${token}`;
+    return apiClient.request(request);
   }
 );
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logoImg from '../assets/logo.jpg';
 import { useAuth } from '../context/AuthContext';
-import { roleDefaultRoutes, getRedirectPathForRole } from '../data/navigation';
+import { getRedirectPathForRole } from '../data/navigation';
 
 export const LoginPage: React.FC = () => {
   const { login, isAuthenticated, currentUser } = useAuth();

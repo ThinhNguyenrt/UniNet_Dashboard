@@ -28,6 +28,8 @@ import { JobPostingsPage } from './pages/moderator/JobPostingsPage';
 import { CareerProfilesPage } from './pages/moderator/CareerProfilesPage';
 import { CommunityPostsPage } from './pages/moderator/CommunityPostsPage';
 import { AdvertisementsPage } from './pages/moderator/AdvertisementsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { NotificationBroadcastsPage } from './pages/admin/NotificationBroadcastsPage';
 
 // Component điều hướng thông minh tại trang gốc "/"
 const RootRedirect: React.FC = () => {
@@ -76,6 +78,12 @@ export const App: React.FC = () => {
             <Route path="service-packages" element={<ServicePackagesPage />} />
             <Route path="skills" element={<SkillsPage />} />
             <Route path="projects" element={<AdminProjectsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notification-broadcasts" element={<NotificationBroadcastsPage />} />
+            <Route path="student-verifications" element={<StudentsPage />} />
+            <Route path="partner-verifications" element={<CompaniesPage />} />
+            <Route path="job-postings" element={<JobPostingsPage />} />
+            <Route path="community-posts" element={<CommunityPostsPage />} />
           </Route>
 
           {/* Phân vùng Verificator */}
@@ -91,6 +99,7 @@ export const App: React.FC = () => {
             <Route path="students" element={<StudentsPage />} />
             <Route path="companies" element={<CompaniesPage />} />
             <Route path="projects" element={<VerificatorProjectsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
           </Route>
 
           {/* Phân vùng Moderator */}
@@ -108,6 +117,7 @@ export const App: React.FC = () => {
             <Route path="career-profiles" element={<CareerProfilesPage />} />
             <Route path="community-posts" element={<CommunityPostsPage />} />
             <Route path="advertisements" element={<AdvertisementsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
           </Route>
 
           {/* Fallback 404 cho mọi route không xác định */}

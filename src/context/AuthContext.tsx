@@ -6,10 +6,12 @@ import type {
   AuthContextType,
   LoginRequest,
   LoginResult,
+  LoginResponse,
 } from '../types/auth';
 import { mockAccounts } from '../data/mockAccount';
 import { authService } from '../services/auth.service';
 import { getApiErrorMessage } from '../services/api';
+import { SESSION_EXPIRED_EVENT, SESSION_GENERATION_KEY, SESSION_REFRESHED_EVENT } from '../services/dashboard-session';
 
 const AUTH_STORAGE_KEY = 'uninet_auth_user';
 
@@ -34,6 +36,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const expired = () => { setCurrentUser(null); navigate('/login', { replace: true, state: {} }); };
+    const refreshed = (event: Event) => {
+      const response = (event as CustomEvent<LoginResponse>).detail;
+      try {
+        const user = authService.transformLoginResponseToUser(response);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+        setCurrentUser(user);
+      } catch { authService.clearAuthData(); expired(); }
+    };
+    const changed = (event: StorageEvent) => {
+      if (event.key === SESSION_GENERATION_KEY || event.key === AUTH_STORAGE_KEY || event.key === null) {
+        const user = authService.getStoredUser();
+        if (!authService.getAccessToken()) expired(); else setCurrentUser(user);
+      }
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, expired);
+    window.addEventListener(SESSION_REFRESHED_EVENT, refreshed);
+    window.addEventListener('storage', changed);
+    return () => { window.removeEventListener(SESSION_EXPIRED_EVENT, expired); window.removeEventListener(SESSION_REFRESHED_EVENT, refreshed); window.removeEventListener('storage', changed); };
+  }, [navigate]);
 
   /**
    * Đăng nhập thông qua API thực tế: POST /auth/login

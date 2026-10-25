@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { NotificationsProvider } from '../../context/NotificationsProvider';
+import { useAuth } from '../../context/AuthContext';
 
 export const DashboardLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { currentUser } = useAuth();
 
   return (
+    <NotificationsProvider key={`${currentUser?.id}:${currentUser?.role}`}>
     <div className="min-h-screen bg-slate-50 text-slate-800 flex">
       {/* Sidebar điều hướng */}
       <Sidebar
@@ -25,6 +29,7 @@ export const DashboardLayout: React.FC = () => {
         </main>
       </div>
     </div>
+    </NotificationsProvider>
   );
 };
 

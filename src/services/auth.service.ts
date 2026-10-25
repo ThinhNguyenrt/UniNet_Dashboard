@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { SESSION_GENERATION_KEY } from './dashboard-session';
 import type {
   LoginRequest,
   LoginResponse,
@@ -67,15 +68,14 @@ export const mapRole = (
   if (roleStr.includes('admin') || roleStr === '2') {
     return { role: 'admin', roleName: 'Admin (Quản trị viên)' };
   }
-  if (roleStr.includes('verif') || roleStr === '3') {
+  if (roleStr.includes('verif') || roleStr === '4') {
     return { role: 'verificator', roleName: 'Verificator (Xác thực viên)' };
   }
-  if (roleStr.includes('mod') || roleStr === '4') {
+  if (roleStr.includes('mod') || roleStr === '3') {
     return { role: 'moderator', roleName: 'Moderator (Kiểm duyệt viên)' };
   }
 
-  // Mặc định fallback
-  return { role: 'admin', roleName: 'Admin (Quản trị viên)' };
+  throw new Error('Tài khoản không có quyền truy cập bảng điều khiển quản trị.');
 };
 
 export const authService = {
@@ -108,9 +108,9 @@ export const authService = {
     const { role, roleName } = mapRole(account.role, accessToken);
 
     const displayName =
-      account.profile.displayName ||
-      account.profile.fullName ||
-      account.profile.nickname ||
+      account.profile?.displayName ||
+      account.profile?.fullName ||
+      account.profile?.nickname ||
       account.email;
 
     return {
@@ -119,8 +119,8 @@ export const authService = {
       email: account.email,
       role,
       roleName,
-      avatar: account.profile.avatarUrl || undefined,
-      description: account.profile.bio || undefined,
+      avatar: account.profile?.avatarUrl || undefined,
+      description: account.profile?.bio || undefined,
       rawRole: account.role,
       account,
       profile: account.profile,
@@ -131,6 +131,7 @@ export const authService = {
    * Lưu thông tin đăng nhập và token vào Storage
    */
   saveAuthData: (data: LoginResponse, user: User): void => {
+    localStorage.setItem(SESSION_GENERATION_KEY, crypto.randomUUID());
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken);
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken);
     localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, data.expiresAt);
@@ -168,6 +169,7 @@ export const authService = {
    * Xóa sạch thông tin đăng nhập khi logout
    */
   clearAuthData: (): void => {
+    localStorage.removeItem(SESSION_GENERATION_KEY);
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);

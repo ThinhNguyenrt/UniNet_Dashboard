@@ -1,10 +1,11 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { X, LogOut, Shield } from 'lucide-react';
+import { X, LogOut, Shield, Bell, Megaphone } from 'lucide-react';
 import logoImg from '../../assets/logo.jpg';
 import { useAuth } from '../../context/AuthContext';
 import { roleNavigationConfig } from '../../data/navigation';
 import { SidebarItem } from './SidebarItem';
+import { useNotifications } from '../../context/notifications-context';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,10 +15,11 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { currentUser, logout } = useAuth();
   const location = useLocation();
+  const { canManage } = useNotifications();
 
   if (!currentUser) return null;
 
-  const navItems = roleNavigationConfig[currentUser.role] || [];
+  const navItems = [...(roleNavigationConfig[currentUser.role] || []), { id: 'notifications', label: 'Thông báo của tôi', path: `/${currentUser.role}/notifications`, icon: Bell }, ...(canManage && currentUser.role === 'admin' ? [{ id: 'notification-broadcasts', label: 'Thông báo hệ thống', path: '/admin/notification-broadcasts', icon: Megaphone }] : [])];
 
   return (
     <>
