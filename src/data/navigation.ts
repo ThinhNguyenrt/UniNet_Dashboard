@@ -116,3 +116,30 @@ export const roleDefaultRoutes: Record<UserRole, string> = {
   verificator: '/verificator/students',
   moderator: '/moderator/projects',
 };
+
+/**
+ * Kiểm tra xem một đường dẫn có hợp lệ và người dùng thuộc vai trò này có quyền truy cập không.
+ */
+export const isPathAllowedForRole = (path: string, role: UserRole): boolean => {
+  if (!path || path === '/' || path === '/login' || path === '/unauthorized') {
+    return false;
+  }
+  // Tuyến đường phải bắt đầu bằng phân vùng tương ứng với role (vd: /moderator/...)
+  return path === `/${role}` || path.startsWith(`/${role}/`);
+};
+
+/**
+ * Phân giải đường dẫn điều hướng an toàn theo role:
+ * Nếu đường dẫn yêu cầu (requestedPath) hợp lệ cho role đó thì ưu tiên giữ lại,
+ * ngược lại luôn chuyển hướng về route mặc định của role đó.
+ */
+export const getRedirectPathForRole = (
+  role: UserRole,
+  requestedPath?: string | null
+): string => {
+  if (requestedPath && isPathAllowedForRole(requestedPath, role)) {
+    return requestedPath;
+  }
+  return roleDefaultRoutes[role] || `/${role}`;
+};
+
