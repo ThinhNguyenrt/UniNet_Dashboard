@@ -30,6 +30,10 @@ import { CommunityPostsPage } from './pages/moderator/CommunityPostsPage';
 import { AdvertisementsPage } from './pages/moderator/AdvertisementsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { NotificationBroadcastsPage } from './pages/admin/NotificationBroadcastsPage';
+import { UsersPage } from './pages/admin/UsersPage';
+import { UserDetailPage } from './pages/admin/UserDetailPage';
+import { AccountVerificationsPage } from './pages/admin/AccountVerificationsPage';
+import { AccountVerificationDetailPage } from './pages/admin/AccountVerificationDetailPage';
 
 // Component điều hướng thông minh tại trang gốc "/"
 const RootRedirect: React.FC = () => {
@@ -75,13 +79,17 @@ export const App: React.FC = () => {
             <Route index element={<Navigate to="/admin/revenue" replace />} />
             <Route path="revenue" element={<RevenuePage />} />
             <Route path="staff" element={<StaffPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="users/:id" element={<UserDetailPage />} />
             <Route path="service-packages" element={<ServicePackagesPage />} />
             <Route path="skills" element={<SkillsPage />} />
             <Route path="projects" element={<AdminProjectsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="notification-broadcasts" element={<NotificationBroadcastsPage />} />
-            <Route path="student-verifications" element={<StudentsPage />} />
-            <Route path="partner-verifications" element={<CompaniesPage />} />
+            <Route path="student-verifications" element={<AccountVerificationsPage kind="student" />} />
+            <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
+            <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
+            <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
             <Route path="job-postings" element={<JobPostingsPage />} />
             <Route path="community-posts" element={<CommunityPostsPage />} />
           </Route>
@@ -98,6 +106,12 @@ export const App: React.FC = () => {
             <Route index element={<Navigate to="/verificator/students" replace />} />
             <Route path="students" element={<StudentsPage />} />
             <Route path="companies" element={<CompaniesPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="users/:id" element={<UserDetailPage />} />
+            <Route path="student-verifications" element={<AccountVerificationsPage kind="student" />} />
+            <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
+            <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
+            <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
             <Route path="projects" element={<VerificatorProjectsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
@@ -117,6 +131,12 @@ export const App: React.FC = () => {
             <Route path="career-profiles" element={<CareerProfilesPage />} />
             <Route path="community-posts" element={<CommunityPostsPage />} />
             <Route path="advertisements" element={<AdvertisementsPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="users/:id" element={<UserDetailPage />} />
+            <Route path="student-verifications" element={<AccountVerificationsPage kind="student" />} />
+            <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
+            <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
+            <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
 

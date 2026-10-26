@@ -12,7 +12,9 @@ export function safeNotificationTarget(target: string | null | undefined, role: 
   if (target === '/notifications') return `/${role}/notifications`;
   try {
     const url = new URL(target, 'https://dashboard.invalid');
-    if (url.origin !== 'https://dashboard.invalid' || !routes[role].includes(url.pathname)) return null;
+    const managementDetail = new RegExp('^/' + role + '/(?:users|student-verifications|partner-verifications)/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').test(url.pathname);
+    const managementList = ['users', 'student-verifications', 'partner-verifications'].some(path => url.pathname === '/' + role + '/' + path);
+    if (url.origin !== 'https://dashboard.invalid' || !routes[role].includes(url.pathname) && !managementDetail && !managementList) return null;
     return url.pathname + url.search;
   } catch { return null; }
 }

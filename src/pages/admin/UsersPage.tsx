@@ -1,0 +1,46 @@
+import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { RefreshCw, UserPlus } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useAdminManagement } from '../../context/admin-management-context';
+import { useNotifications } from '../../context/notifications-context';
+import { useAdminResource, useDebouncedSearch } from '../../hooks/useAdminResource';
+import { adminManagementService } from '../../services/admin-management.service';
+import { adminPermissions as permission, accountStatusLabels, roleLabels, type AdminUser } from '../../types/admin-management';
+import { managementButton, managementDate, managementInput } from '../../utils/management';
+import { AccountAvatar, ManagementAccess, ManagementError, ManagementPagination, ManagementSkeleton, ManagementStats, ManagementToast, VerificationBadge } from '../../components/management/ManagementUI';
+import { AccountStatusDialog } from '../../components/management/AccountStatusDialog';
+import { CreateStaffDialog, StaffPermissionsDialog } from '../../components/management/StaffDialogs';
+
+export function UsersPage({ staffOnly = false }: { staffOnly?: boolean }) { return <ManagementAccess permission={permission.usersView}><UsersContent staffOnly={staffOnly} /></ManagementAccess>; }
+
+function UsersContent({ staffOnly }: { staffOnly: boolean }) {
+  const { currentUser } = useAuth(); const access = useAdminManagement(); const { revision } = useNotifications();
+  const [search, setSearch] = useState(''), [role, setRole] = useState(''), [status, setStatus] = useState(''), [verification, setVerification] = useState(''), [sort, setSort] = useState('createdAt-desc'), [page, setPage] = useState(1);
+  const [statusUser, setStatusUser] = useState<AdminUser | null>(null), [permissionUser, setPermissionUser] = useState<AdminUser | null>(null), [creating, setCreating] = useState(false), [notice, setNotice] = useState('');
+  const query = useDebouncedSearch(search);
+  const load = useCallback(async (signal: AbortSignal) => {
+    const [data, stats] = await Promise.all([adminManagementService.users({ page, pageSize: 20, search: query, role: role === '' ? undefined : Number(role), status: status === '' ? undefined : Number(status), verification, sort: sort.split('-')[0], desc: sort.endsWith('desc'), staffOnly }, signal), staffOnly ? Promise.resolve(null) : adminManagementService.userStats(signal)]);
+    return { page: data, stats };
+  }, [page, query, role, status, verification, sort, staffOnly]);
+  const resource = useAdminResource(load, revision); const rows = resource.data?.page.items ?? [], stats = resource.data?.stats;
+  const changeFilter = (setter: (value: string) => void, value: string) => { setter(value); setPage(1); };
+  const done = (message: string) => { setStatusUser(null); setPermissionUser(null); setCreating(false); setNotice(message); resource.reload(); access.refresh(); };
+  return <div className="space-y-5">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">{staffOnly ? 'Quản lý nhân viên' : 'Quản lý người dùng'}</h1><p className="mt-1 text-sm text-slate-500">{staffOnly ? 'Nhân sự vận hành và quyền truy cập thực tế trên UniNet.' : 'Quản lý tài khoản và trạng thái hoạt động trên UniNet.'}</p></div><div className="flex gap-2"><button aria-label="Làm mới người dùng" onClick={resource.reload} className={managementButton}><RefreshCw size={17} /></button>{staffOnly && currentUser?.role === 'admin' && access.has(permission.staffManage) && <button className={managementButton} onClick={() => setCreating(true)}><UserPlus size={17} />Thêm nhân viên</button>}</div></div>
+    {!staffOnly && <ManagementStats items={[{ label: 'Tổng người dùng', value: stats?.total }, { label: 'Đang hoạt động', value: stats?.active }, { label: 'Đã khóa', value: stats?.locked }, { label: 'Đã xác minh', value: stats?.verified }]} />}
+    <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5">
+      <label className="space-y-1 text-xs text-slate-500 xl:col-span-2"><span>Tìm kiếm</span><input aria-label="Tìm người dùng" placeholder="Tên, email hoặc mã tài khoản" value={search} onChange={event => changeFilter(setSearch, event.target.value)} className={managementInput} /></label>
+      <label className="space-y-1 text-xs text-slate-500"><span>Loại tài khoản</span><select value={role} onChange={event => changeFilter(setRole, event.target.value)} className={managementInput}><option value="">Tất cả vai trò</option>{roleLabels.map((label, value) => (staffOnly ? value >= 2 : value <= 1) && <option value={value} key={value}>{label}</option>)}</select></label>
+      <label className="space-y-1 text-xs text-slate-500"><span>Trạng thái tài khoản</span><select value={status} onChange={event => changeFilter(setStatus, event.target.value)} className={managementInput}><option value="">Tất cả trạng thái</option><option value="1">Đang hoạt động</option><option value="2">Đã khóa</option><option value="0">Chờ kích hoạt</option></select></label>
+      <label className="space-y-1 text-xs text-slate-500"><span>Xác minh</span><select value={verification} onChange={event => changeFilter(setVerification, event.target.value)} className={managementInput}><option value="">Tất cả xác minh</option><option value="unverified">Chưa xác minh</option><option value="pending">Chờ duyệt</option><option value="verified">Đã xác minh</option><option value="rejected">Bị từ chối</option></select></label>
+    </div>
+    <div className="flex justify-end"><label className="flex items-center gap-2 text-xs text-slate-500"><span className="shrink-0 whitespace-nowrap">Sắp xếp</span><select value={sort} onChange={event => changeFilter(setSort, event.target.value)} className={managementInput}><option value="createdAt-desc">Mới đăng ký</option><option value="createdAt-asc">Cũ nhất</option><option value="name-asc">Tên A–Z</option><option value="email-asc">Email A–Z</option></select></label></div>
+    {resource.loading ? <ManagementSkeleton /> : resource.error ? <ManagementError message={resource.error} retry={resource.reload} /> : <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-xs text-slate-500"><tr><th className="p-4">Người dùng</th><th className="hidden p-4 md:table-cell">Loại tài khoản</th><th className="hidden p-4 xl:table-cell">Ngày đăng ký</th><th className="hidden p-4 lg:table-cell">Xác minh</th><th className="p-4">Tài khoản</th><th className="p-4 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(user => <tr key={user.id} data-testid={'user-' + user.id}><td className="max-w-56 p-4"><div className="flex items-center gap-3"><AccountAvatar name={user.fullName} url={user.avatarUrl} /><div className="min-w-0"><p className="truncate font-semibold text-slate-900">{user.fullName}</p><p className="break-all text-xs text-slate-500">{user.email}</p></div></div></td><td className="hidden p-4 text-slate-600 md:table-cell">{roleLabels[user.role]}</td><td className="hidden p-4 text-xs text-slate-500 xl:table-cell">{managementDate(user.createdAt)}</td><td className="hidden p-4 lg:table-cell"><VerificationBadge status={user.verificationStatus} verified={user.isVerified} /></td><td className="p-4"><span className={'inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs ' + (user.status === 1 ? 'bg-emerald-50 text-emerald-700' : user.status === 2 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600')}>{accountStatusLabels[user.status]}</span></td><td className="p-4"><div className="flex flex-wrap justify-end gap-2">{access.has(permission.usersDetail) && <Link to={'/' + currentUser?.role + '/users/' + user.id} className={managementButton}>Chi tiết</Link>}{user.role <= 1 && user.id !== currentUser?.id && (user.status === 1 && access.has(permission.usersLock) || user.status === 2 && access.has(permission.usersUnlock)) && <button onClick={() => setStatusUser(user)} className={managementButton}>{user.status === 1 ? 'Khóa' : 'Mở khóa'}</button>}{staffOnly && user.role >= 3 && currentUser?.role === 'admin' && access.has(permission.permissionsManage) && <button onClick={() => setPermissionUser(user)} className={managementButton}>Phân quyền</button>}</div></td></tr>)}</tbody></table>{!rows.length && <p className="p-10 text-center text-sm text-slate-500">Không có tài khoản phù hợp bộ lọc.</p>}</div>}
+    <ManagementPagination page={page} pageSize={20} total={resource.data?.page.total ?? 0} disabled={resource.loading} onPage={setPage} />
+    {statusUser && <AccountStatusDialog user={statusUser} onClose={() => setStatusUser(null)} onDone={() => done('Đã cập nhật trạng thái tài khoản.')} />}
+    {permissionUser && <StaffPermissionsDialog user={permissionUser} onClose={() => setPermissionUser(null)} onDone={() => done('Đã lưu phân quyền nhân viên.')} />}
+    {creating && <CreateStaffDialog onClose={() => setCreating(false)} onDone={() => done('Đã tạo tài khoản nhân viên.')} />}
+    {notice && <ManagementToast message={notice} onClose={() => setNotice('')} />}
+  </div>;
+}

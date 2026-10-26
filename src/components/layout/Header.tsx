@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="p-2 -ml-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl lg:hidden transition-colors"
+          className="p-2 -ml-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
           aria-label="Mở thanh điều hướng"
         >
           <Menu className="w-5 h-5" />

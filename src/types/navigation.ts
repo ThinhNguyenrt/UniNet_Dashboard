@@ -9,6 +9,8 @@ export interface NavigationSubItem {
 }
 
 export interface NavigationItem {
+  section?: string;
+  permission?: string;
   id: string;
   label: string;
   path?: string;

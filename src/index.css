@@ -2,7 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .skill-icon-scan-line {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 2px;
+    background: #2563eb;
+    box-shadow: 0 0 10px 3px rgb(59 130 246 / 45%);
+    animation: skill-icon-scan 1.2s ease-in-out infinite alternate;
+  }
+
+  @keyframes skill-icon-scan {
+    from { transform: translateY(0); }
+    to { transform: translateY(4.75rem); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skill-icon-scan-line {
+      animation: none;
+      transform: translateY(2.375rem);
+    }
+  }
+}
+
 @layer base {
+  @media (min-width: 1024px) {
+    html {
+      font-size: 93.75%;
+    }
+  }
+
   html,
   body {
     margin: 0;
