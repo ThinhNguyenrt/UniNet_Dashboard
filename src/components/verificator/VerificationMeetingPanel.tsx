@@ -17,12 +17,16 @@ import {
   FileCheck,
   ShieldCheck,
   HelpCircle,
+  Lock,
+  ArrowRight,
 } from 'lucide-react';
 import {
   verificatorMeetingService,
   parseMeetingErrorMessage,
   getMeetingLifecycleStatus,
   formatMeetingDuration,
+  getRemainingSeconds,
+  formatCountdown,
 } from '../../services/verificator-meeting.service';
 import type { MeetingResponse } from '../../types/verificator-assignments';
 import { managementDate } from '../../utils/management';
@@ -45,8 +49,10 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
   const [meeting, setMeeting] = useState<MeetingResponse | null>(initialMeeting || null);
   const [loading, setLoading] = useState<boolean>(!initialMeeting);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [actionStep, setActionStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'info'; text: string } | null>(null);
+  const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
 
   // Chế độ nhúng video trực tiếp trên giao diện
@@ -54,30 +60,35 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [embeddedUrl, setEmbeddedUrl] = useState<string | null>(initialMeeting?.joinUrl || null);
 
-  // Mốc thời gian hiện tại để cập nhật live timer
+  // Mốc thời gian hiện tại để cập nhật live timer và countdown
   const [now, setNow] = useState<number>(() => Date.now());
 
   // Modal xác nhận kết thúc cuộc họp
   const [showEndConfirm, setShowEndConfirm] = useState<boolean>(false);
 
-  // Tải thông tin phòng họp
-  const loadMeeting = useCallback(async () => {
-    if (!assignmentId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await verificatorMeetingService.getMeeting(assignmentId);
-      setMeeting(data);
-      if (data.joinUrl) {
-        setEmbeddedUrl(data.joinUrl);
+  // Tải thông tin phòng họp từ backend (nguồn xác nhận trạng thái)
+  const loadMeeting = useCallback(
+    async (isSilent = false) => {
+      if (!assignmentId) return;
+      if (!isSilent) setLoading(true);
+      setError(null);
+      try {
+        const data = await verificatorMeetingService.getMeeting(assignmentId);
+        setMeeting(data);
+        if (data.joinUrl) {
+          setEmbeddedUrl(data.joinUrl);
+        }
+        onMeetingUpdated?.(data);
+      } catch (err) {
+        if (!isSilent) {
+          setError(parseMeetingErrorMessage(err, 'Chưa thể tải dữ liệu phòng họp.'));
+        }
+      } finally {
+        if (!isSilent) setLoading(false);
       }
-      onMeetingUpdated?.(data);
-    } catch (err) {
-      setError(parseMeetingErrorMessage(err, 'Chưa thể tải dữ liệu phòng họp.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [assignmentId, onMeetingUpdated]);
+    },
+    [assignmentId, onMeetingUpdated]
+  );
 
   useEffect(() => {
     if (!initialMeeting) {
@@ -93,12 +104,51 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
 
   const lifecycle = getMeetingLifecycleStatus(meeting);
 
-  // Cập nhật mốc thời gian mỗi giây khi cuộc họp đang diễn ra
+  // Kiểm tra thời gian chờ trước giờ hẹn
+  const remainingSeconds = getRemainingSeconds(meeting?.scheduledStartAt, now);
+  const isBeforeScheduledTime = Boolean(
+    meeting?.scheduledStartAt &&
+      !meeting?.meetingStartAt &&
+      !meeting?.meetingEndAt &&
+      remainingSeconds > 0
+  );
+
+  // Cập nhật live timer mỗi giây: khi đang họp hoặc khi đang đếm ngược chờ đến giờ hẹn
   useEffect(() => {
-    if (lifecycle !== 'InProgress') return;
+    const hasScheduledCountdown = Boolean(
+      meeting?.scheduledStartAt && !meeting?.meetingStartAt && !meeting?.meetingEndAt
+    );
+    const isInProgress = lifecycle === 'InProgress';
+
+    if (!hasScheduledCountdown && !isInProgress) return;
+
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
-  }, [lifecycle]);
+  }, [lifecycle, meeting?.scheduledStartAt, meeting?.meetingStartAt, meeting?.meetingEndAt]);
+
+  // Refresh dữ liệu khi quay lại dashboard (chuyển tab hoặc focus cửa sổ)
+  // Không tự ý kết thúc phiên khi đóng tab hoặc rời Jitsi
+  useEffect(() => {
+    let lastFetchTime = Date.now();
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        const currentTime = Date.now();
+        // Giới hạn tần suất gọi lại tối thiểu cách nhau 3 giây
+        if (currentTime - lastFetchTime > 3000) {
+          lastFetchTime = currentTime;
+          void loadMeeting(true);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [loadMeeting]);
 
   // Tính toán thời gian đã họp trực tiếp (live elapsed seconds)
   const elapsedSeconds =
@@ -117,11 +167,30 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
     return `${pad(minutes)}:${pad(seconds)}`;
   };
 
-  // Thao tác: Tạo hoặc lấy phòng họp
+  // Mở URL phòng họp và phát hiện nếu popup bị trình duyệt chặn
+  const openMeetingUrl = (url: string): boolean => {
+    try {
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        setPopupBlockedUrl(url);
+        return false;
+      }
+      setPopupBlockedUrl(null);
+      return true;
+    } catch {
+      setPopupBlockedUrl(url);
+      return false;
+    }
+  };
+
+  // Thao tác 1: Khởi tạo phòng họp (cho phép tạo trước giờ hẹn)
   const handleCreateMeeting = async () => {
+    if (actionLoading) return;
     setActionLoading(true);
+    setActionStep('Đang khởi tạo phòng họp...');
     setError(null);
     setNotice(null);
+    setPopupBlockedUrl(null);
     try {
       const data = await verificatorMeetingService.createOrGetMeeting(assignmentId);
       setMeeting(data);
@@ -129,65 +198,157 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
         setEmbeddedUrl(data.joinUrl);
       }
       onMeetingUpdated?.(data);
-      setNotice({ type: 'success', text: 'Khởi tạo phòng họp xác minh trực tuyến thành công.' });
+      setNotice({
+        type: 'success',
+        text: 'Khởi tạo phòng họp xác minh trực tuyến thành công.',
+      });
     } catch (err) {
       setError(parseMeetingErrorMessage(err, 'Không thể khởi tạo phòng họp xác minh.'));
     } finally {
       setActionLoading(false);
+      setActionStep(null);
     }
   };
 
-  // Thao tác: Lấy link và tham gia
-  const handleJoinMeeting = async (openExternal = true) => {
+  // Thao tác 2: Bắt đầu và tham gia (chuỗi tuần tự: tạo phòng nếu chưa có -> start nếu chưa bắt đầu -> join & mở Jitsi)
+  const handleStartAndJoinMeeting = async () => {
+    if (actionLoading) return;
+    if (isBeforeScheduledTime) {
+      setError(`Chưa đến giờ hẹn bắt đầu buổi họp (Còn ${formatCountdown(remainingSeconds)}).`);
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
     setNotice(null);
+    setPopupBlockedUrl(null);
+
+    let currentMeeting = meeting;
+
+    // Bước A: Tạo phòng nếu chưa có
+    if (!currentMeeting?.roomName && !currentMeeting?.joinUrl) {
+      setActionStep('Đang khởi tạo phòng họp Jitsi...');
+      try {
+        const created = await verificatorMeetingService.createOrGetMeeting(assignmentId);
+        currentMeeting = created;
+        setMeeting(created);
+        onMeetingUpdated?.(created);
+      } catch (err) {
+        setError(parseMeetingErrorMessage(err, 'Không thể khởi tạo phòng họp. Vui lòng thử lại.'));
+        setActionLoading(false);
+        setActionStep(null);
+        return;
+      }
+    }
+
+    // Bước B: Bắt đầu buổi họp nếu chưa bắt đầu
+    if (!currentMeeting.meetingStartAt) {
+      setActionStep('Đang ghi nhận bắt đầu buổi họp...');
+      try {
+        const started = await verificatorMeetingService.startMeeting(assignmentId);
+        currentMeeting = started;
+        setMeeting(started);
+        onMeetingUpdated?.(started);
+      } catch (err) {
+        setError(parseMeetingErrorMessage(err, 'Không thể ghi nhận bắt đầu cuộc họp. Vui lòng thử lại.'));
+        setActionLoading(false);
+        setActionStep(null);
+        return;
+      }
+    }
+
+    // Bước C: Lấy liên kết tham gia phòng họp (join)
+    setActionStep('Đang lấy liên kết tham gia phòng họp...');
+    let joinUrl = currentMeeting.joinUrl;
     try {
       const joinData = await verificatorMeetingService.joinMeeting(assignmentId);
       if (joinData.joinUrl) {
+        joinUrl = joinData.joinUrl;
         setEmbeddedUrl(joinData.joinUrl);
-        if (openExternal) {
-          window.open(joinData.joinUrl, '_blank', 'noopener,noreferrer');
-          setNotice({
-            type: 'info',
-            text: 'Đã mở phòng họp trong thẻ mới. Bạn có thể bật camera/microphone để bắt đầu trao đổi.',
-          });
-        } else {
-          setIsEmbedded(true);
-        }
-      } else {
-        throw new Error('Máy chủ không trả về liên kết tham gia phòng họp.');
       }
     } catch (err) {
-      setError(parseMeetingErrorMessage(err, 'Không thể tham gia phòng họp.'));
-    } finally {
+      // BƯỚC B ĐÃ THÀNH CÔNG -> GIỮ NGUYÊN TRẠNG THÁI ĐÃ BẮT ĐẦU VÀ CHO THAM GIA LẠI
+      setError(
+        parseMeetingErrorMessage(
+          err,
+          'Buổi họp đã được ghi nhận bắt đầu thành công, nhưng chưa thể lấy liên kết Jitsi. Bạn có thể nhấn "Tham gia lại" để thử mở lại.'
+        )
+      );
       setActionLoading(false);
+      setActionStep(null);
+      return;
     }
+
+    // Bước D: Mở phòng họp Jitsi
+    if (!joinUrl) {
+      setError('Không tìm thấy liên kết tham gia phòng họp Jitsi. Bạn có thể nhấn "Tham gia lại".');
+      setActionLoading(false);
+      setActionStep(null);
+      return;
+    }
+
+    const opened = openMeetingUrl(joinUrl);
+    if (opened) {
+      setNotice({
+        type: 'success',
+        text: 'Buổi họp đã bắt đầu thành công và phòng họp Jitsi đã được mở trong thẻ mới.',
+      });
+    } else {
+      setNotice({
+        type: 'info',
+        text: 'Buổi họp đã bắt đầu. Trình duyệt đã chặn mở tab tự động — vui lòng bấm nút "Mở phòng họp ngay" bên dưới.',
+      });
+    }
+
+    setActionLoading(false);
+    setActionStep(null);
   };
 
-  // Thao tác: Bắt đầu cuộc họp
-  const handleStartMeeting = async () => {
+  // Thao tác 3: Tham gia lại (dành cho phiên đã bắt đầu, tuyệt đối KHÔNG gọi lại start)
+  const handleRejoinMeeting = async () => {
+    if (actionLoading) return;
     setActionLoading(true);
+    setActionStep('Đang kết nối lại phòng họp...');
     setError(null);
     setNotice(null);
+    setPopupBlockedUrl(null);
+
     try {
-      const updated = await verificatorMeetingService.startMeeting(assignmentId);
-      setMeeting(updated);
-      onMeetingUpdated?.(updated);
-      setNotice({ type: 'success', text: 'Đã bắt đầu buổi họp xác minh. Đồng hồ thời gian đã kích hoạt.' });
+      const joinData = await verificatorMeetingService.joinMeeting(assignmentId);
+      const joinUrl = joinData.joinUrl || meeting?.joinUrl || embeddedUrl;
+      if (!joinUrl) {
+        throw new Error('Không tìm thấy liên kết tham gia phòng họp.');
+      }
+      setEmbeddedUrl(joinUrl);
+      const opened = openMeetingUrl(joinUrl);
+      if (opened) {
+        setNotice({
+          type: 'info',
+          text: 'Đã mở lại phòng họp trong thẻ mới. Bạn có thể tiếp tục trao đổi với nhóm dự án.',
+        });
+      } else {
+        setNotice({
+          type: 'info',
+          text: 'Trình duyệt đã chặn mở tab tự động. Vui lòng bấm nút "Mở phòng họp ngay" bên dưới.',
+        });
+      }
     } catch (err) {
-      setError(parseMeetingErrorMessage(err, 'Không thể ghi nhận bắt đầu cuộc họp.'));
+      setError(parseMeetingErrorMessage(err, 'Không thể tham gia lại phòng họp. Vui lòng thử lại.'));
     } finally {
       setActionLoading(false);
+      setActionStep(null);
     }
   };
 
-  // Thao tác: Xác nhận kết thúc cuộc họp
+  // Thao tác 4: Xác nhận kết thúc cuộc họp qua modal
   const handleConfirmEndMeeting = async () => {
+    if (actionLoading) return;
     setShowEndConfirm(false);
     setActionLoading(true);
+    setActionStep('Đang kết thúc buổi họp...');
     setError(null);
     setNotice(null);
+    setPopupBlockedUrl(null);
     try {
       const updated = await verificatorMeetingService.endMeeting(assignmentId);
       setMeeting(updated);
@@ -195,18 +356,19 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
       onMeetingUpdated?.(updated);
       setNotice({
         type: 'success',
-        text: 'Buổi họp xác minh đã kết thúc thành công! Bạn hiện đã có thể nộp báo cáo kết luận.',
+        text: 'Buổi họp xác minh đã kết thúc thành công! Bạn hiện đã có thể chuyển sang nộp báo cáo kết luận.',
       });
     } catch (err) {
-      setError(parseMeetingErrorMessage(err, 'Không thể ghi nhận kết thúc cuộc họp.'));
+      setError(parseMeetingErrorMessage(err, 'Không thể ghi nhận kết thúc cuộc họp. Vui lòng thử lại.'));
     } finally {
       setActionLoading(false);
+      setActionStep(null);
     }
   };
 
   const copyJoinLink = () => {
-    if (!meeting?.joinUrl && !embeddedUrl) return;
-    const url = meeting?.joinUrl || embeddedUrl || '';
+    const url = meeting?.joinUrl || embeddedUrl || popupBlockedUrl || '';
+    if (!url) return;
     void navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -224,6 +386,49 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
 
   return (
     <div className="space-y-6">
+      {/* Banner cảnh báo khi popup bị trình duyệt chặn */}
+      {popupBlockedUrl && (
+        <div className="p-4 rounded-2xl border bg-amber-50 border-amber-300 text-amber-900 text-xs sm:text-sm space-y-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">Trình duyệt đã chặn cửa sổ bật lên tự động (Popup Blocked)</p>
+              <p>
+                Trình duyệt của bạn đang chặn mở thẻ mới tự động. Vui lòng nhấn vào nút bên dưới để mở trực tiếp
+                phòng họp Jitsi Meet:
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pl-7.5">
+            <a
+              href={popupBlockedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setPopupBlockedUrl(null)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Mở phòng họp ngay
+            </a>
+            <button
+              type="button"
+              onClick={copyJoinLink}
+              className="px-3.5 py-2 bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Đã sao chép liên kết' : 'Sao chép liên kết'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPopupBlockedUrl(null)}
+              className="px-3 py-2 text-slate-500 hover:text-slate-700 text-xs"
+            >
+              Đóng cảnh báo
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Thông báo kết quả thao tác */}
       {notice && (
         <div
@@ -281,10 +486,16 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
                 Chưa khởi tạo phòng
               </span>
             )}
-            {lifecycle === 'Ready' && (
+            {lifecycle === 'Ready' && !isBeforeScheduledTime && (
               <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-200 inline-flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
                 Phòng họp sẵn sàng
+              </span>
+            )}
+            {isBeforeScheduledTime && (
+              <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200 inline-flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-amber-600" />
+                Chờ đến giờ hẹn ({formatCountdown(remainingSeconds)})
               </span>
             )}
             {lifecycle === 'InProgress' && (
@@ -307,14 +518,33 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
 
             <button
               type="button"
+              disabled={actionLoading}
               onClick={() => void loadMeeting()}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition"
-              title="Làm mới trạng thái cuộc họp"
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition disabled:opacity-50"
+              title="Làm mới trạng thái cuộc họp từ máy chủ"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin text-blue-600' : ''}`} />
             </button>
           </div>
         </div>
+
+        {/* Banner đếm ngược chờ đến giờ hẹn (Trước giờ hẹn) */}
+        {isBeforeScheduledTime && (
+          <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start gap-3 text-xs sm:text-sm text-amber-900">
+            <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">Chưa đến giờ hẹn bắt đầu buổi họp</p>
+              <p className="text-amber-800 leading-relaxed">
+                Lịch hẹn xác minh: <span className="font-semibold">{managementDate(meeting?.scheduledStartAt)}</span>.
+                Chức năng bắt đầu buổi họp sẽ tự động mở khóa sau{' '}
+                <span className="font-bold font-mono text-amber-950 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                  {formatCountdown(remainingSeconds)}
+                </span>
+                . Bạn vẫn có thể khởi tạo phòng trước bên dưới để sẵn sàng.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Thông tin thời gian & Phòng họp */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
@@ -340,7 +570,9 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
               {meeting?.meetingStartAt ? managementDate(meeting.meetingStartAt) : 'Chưa bắt đầu'}
             </p>
             {meeting?.meetingStartAt && lifecycle === 'InProgress' && (
-              <p className="text-[11px] text-emerald-600 font-medium">Thời gian diễn ra: {formatTimer(elapsedSeconds)}</p>
+              <p className="text-[11px] text-emerald-600 font-medium">
+                Thời gian diễn ra: {formatTimer(elapsedSeconds)}
+              </p>
             )}
           </div>
 
@@ -362,90 +594,118 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
 
         {/* Thanh điều khiển phòng họp và nút hành động */}
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
             <div className="space-y-1">
               <span className="text-xs font-semibold text-slate-700">Điều khiển buổi họp trực tuyến</span>
               <p className="text-[11px] text-slate-500">
-                {lifecycle === 'NotCreated' && 'Hãy nhấn Khởi tạo phòng họp để cấp phát phòng họp trực tuyến Jitsi.'}
-                {lifecycle === 'Ready' && 'Phòng đã sẵn sàng. Bạn có thể tham gia và bấm Bắt đầu cuộc họp khi nhóm tham dự.'}
-                {lifecycle === 'InProgress' && 'Buổi họp đang diễn ra. Bấm Kết thúc sau khi phỏng vấn xong.'}
-                {lifecycle === 'Completed' && 'Buổi họp đã kết thúc. Bạn có thể tiến hành nộp báo cáo kết luận thẩm định.'}
+                {lifecycle === 'NotCreated' &&
+                  (isBeforeScheduledTime
+                    ? 'Bạn có thể bấm Khởi tạo phòng họp trước giờ hẹn để hệ thống cấp sẵn URL Jitsi.'
+                    : 'Bấm "Bắt đầu và tham gia" để hệ thống tự động khởi tạo, kích hoạt và mở phòng họp.')}
+                {lifecycle === 'Ready' &&
+                  (isBeforeScheduledTime
+                    ? 'Phòng họp đã được khởi tạo. Nút bắt đầu đang khóa chờ đến giờ hẹn.'
+                    : 'Đã đến giờ hẹn. Bấm "Bắt đầu và tham gia" để kích hoạt phiên họp và kết nối trực tiếp.')}
+                {lifecycle === 'InProgress' &&
+                  'Buổi họp đang diễn ra. Bấm "Tham gia lại" nếu cần mở lại phòng, hoặc bấm "Kết thúc cuộc họp" sau khi hoàn tất.'}
+                {lifecycle === 'Completed' &&
+                  'Buổi họp đã kết thúc. Vui lòng chuyển sang bước nộp báo cáo kết luận thẩm định.'}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Nút 1: Khởi tạo phòng nếu chưa có */}
-              {lifecycle === 'NotCreated' && (
+              {/* TRƯỜNG HỢP 1: TRƯỚC GIỜ HẸN */}
+              {isBeforeScheduledTime && (
+                <>
+                  {/* Cho phép khởi tạo phòng trước giờ hẹn nếu chưa có */}
+                  {lifecycle === 'NotCreated' && (
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={() => void handleCreateMeeting()}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+                    >
+                      <Video className="w-4 h-4" />
+                      {actionLoading ? (actionStep || 'Đang tạo phòng...') : 'Khởi tạo phòng họp trước'}
+                    </button>
+                  )}
+
+                  {/* Nút bắt đầu bị khóa trước giờ hẹn kèm thời gian chờ */}
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="px-4 py-2 bg-slate-200 text-slate-500 rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-not-allowed opacity-80"
+                    title={`Chưa đến giờ hẹn. Còn ${formatCountdown(remainingSeconds)}`}
+                  >
+                    <Lock className="w-4 h-4 text-slate-400" />
+                    Khóa bắt đầu (Còn {formatCountdown(remainingSeconds)})
+                  </button>
+                </>
+              )}
+
+              {/* TRƯỜNG HỢP 2: ĐẾN GIỜ (CHƯA BẮT ĐẦU: lifecycle !== InProgress && lifecycle !== Completed && !isBeforeScheduledTime) */}
+              {!isBeforeScheduledTime && lifecycle !== 'InProgress' && lifecycle !== 'Completed' && (
                 <button
                   type="button"
                   disabled={actionLoading}
-                  onClick={() => void handleCreateMeeting()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+                  onClick={() => void handleStartAndJoinMeeting()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
                 >
-                  <Video className="w-4 h-4" />
-                  {actionLoading ? 'Đang tạo phòng...' : 'Khởi tạo phòng họp'}
+                  {actionLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  {actionLoading ? (actionStep || 'Đang xử lý...') : 'Bắt đầu và tham gia'}
                 </button>
               )}
 
-              {/* Nút 2: Tham gia phòng (Mở tab mới) */}
-              {lifecycle !== 'NotCreated' && (
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={() => void handleJoinMeeting(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Tham gia phòng họp (Thẻ mới)
-                </button>
-              )}
-
-              {/* Nút 3: Bật/tắt chế độ nhúng trực tiếp */}
-              {lifecycle !== 'NotCreated' && (
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={() => {
-                    if (!isEmbedded && (!embeddedUrl || embeddedUrl === '')) {
-                      void handleJoinMeeting(false);
-                    } else {
-                      setIsEmbedded((prev) => !prev);
-                    }
-                  }}
-                  className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition"
-                >
-                  <Tv className="w-3.5 h-3.5 text-blue-600" />
-                  {isEmbedded ? 'Đóng khung nhúng' : 'Xem nhúng tại trang'}
-                </button>
-              )}
-
-              {/* Nút 4: Bắt đầu cuộc họp */}
-              {lifecycle === 'Ready' && (
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={() => void handleStartMeeting()}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
-                >
-                  <Play className="w-4 h-4" />
-                  {actionLoading ? 'Đang xử lý...' : 'Bắt đầu cuộc họp'}
-                </button>
-              )}
-
-              {/* Nút 5: Kết thúc cuộc họp */}
+              {/* TRƯỜNG HỢP 3: PHIÊN ĐÃ BẮT ĐẦU (chỉ hiển thị "Tham gia lại", không gọi start nữa) */}
               {lifecycle === 'InProgress' && (
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={() => setShowEndConfirm(true)}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
-                >
-                  <Square className="w-4 h-4" />
-                  Kết thúc cuộc họp
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => void handleRejoinMeeting()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+                  >
+                    {actionLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ExternalLink className="w-4 h-4" />
+                    )}
+                    {actionLoading ? (actionStep || 'Đang xử lý...') : 'Tham gia lại'}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => {
+                      if (!isEmbedded && (!embeddedUrl || embeddedUrl === '')) {
+                        void handleRejoinMeeting();
+                      } else {
+                        setIsEmbedded((prev) => !prev);
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition"
+                  >
+                    <Tv className="w-3.5 h-3.5 text-blue-600" />
+                    {isEmbedded ? 'Đóng khung nhúng' : 'Xem nhúng tại trang'}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => setShowEndConfirm(true)}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+                  >
+                    <Square className="w-4 h-4" />
+                    Kết thúc cuộc họp
+                  </button>
+                </>
               )}
 
-              {/* Nút 6: Nút chuyển sang nộp báo cáo khi đã kết thúc */}
+              {/* TRƯỜNG HỢP 4: PHIÊN ĐÃ KẾT THÚC (Ẩn nút tham gia, chỉ hiển thị nút nộp report) */}
               {lifecycle === 'Completed' && onNavigateToReport && (
                 <button
                   type="button"
@@ -453,16 +713,17 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition"
                 >
                   <FileCheck className="w-4 h-4" />
-                  Chuyển sang Báo cáo Thẩm định
+                  Nộp báo cáo thẩm định
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Hộp chia sẻ liên kết phòng họp (nếu có) */}
-          {(meeting?.joinUrl || embeddedUrl) && (
+          {/* Hộp chia sẻ liên kết phòng họp (nếu có và phiên chưa kết thúc) */}
+          {lifecycle !== 'Completed' && (meeting?.joinUrl || embeddedUrl) && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-blue-50/60 rounded-xl border border-blue-200 text-xs text-blue-900">
-              <span className="font-medium">Liên kết phòng họp đã được cấu hình sẵn sàng cho buổi thẩm định.</span>
+              <span className="font-medium">Liên kết phòng họp Jitsi Meet đã sẵn sàng cho buổi thẩm định.</span>
               <button
                 type="button"
                 onClick={copyJoinLink}
@@ -473,10 +734,40 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
               </button>
             </div>
           )}
+
+          {/* Banner thông báo khi phiên đã hoàn thành */}
+          {lifecycle === 'Completed' && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs sm:text-sm text-emerald-900">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">Buổi họp xác minh đã kết thúc thành công</p>
+                  <p className="text-emerald-800 text-xs">
+                    Thời lượng họp thực tế:{' '}
+                    <span className="font-semibold">
+                      {formatMeetingDuration(meeting?.meetingStartAt, meeting?.meetingEndAt)}
+                    </span>
+                    . Phiên họp đã chốt trên hệ thống và các nút tham gia đã được ẩn.
+                  </p>
+                </div>
+              </div>
+              {onNavigateToReport && (
+                <button
+                  type="button"
+                  onClick={onNavigateToReport}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition shrink-0"
+                >
+                  <FileCheck className="w-4 h-4" />
+                  Chuyển sang Báo cáo thẩm định
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Khung nhúng Jitsi Video Call trực tiếp */}
-        {isEmbedded && embeddedUrl && (
+        {/* Khung nhúng Jitsi Video Call trực tiếp (khi InProgress và người dùng bật) */}
+        {lifecycle === 'InProgress' && isEmbedded && embeddedUrl && (
           <div
             className={`border border-slate-200 rounded-2xl overflow-hidden bg-slate-900 shadow-md transition-all ${
               isFullscreen
@@ -489,17 +780,15 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
               <div className="flex items-center gap-2">
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="font-semibold">Phòng họp trực tuyến</span>
-                {lifecycle === 'InProgress' && (
-                  <span className="font-mono bg-slate-900 text-emerald-400 px-2 py-0.5 rounded text-[11px]">
-                    {formatTimer(elapsedSeconds)}
-                  </span>
-                )}
+                <span className="font-mono bg-slate-900 text-emerald-400 px-2 py-0.5 rounded text-[11px]">
+                  {formatTimer(elapsedSeconds)}
+                </span>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.open(embeddedUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => openMeetingUrl(embeddedUrl)}
                   className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] font-medium inline-flex items-center gap-1"
                 >
                   <ExternalLink className="w-3 h-3" />
@@ -566,12 +855,13 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
             <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
               <HelpCircle className="w-4 h-4 text-amber-600" />
-              Quy định hệ thống
+              Quy tắc phòng họp & Vòng đời
             </h4>
             <div className="space-y-1 text-slate-600 leading-relaxed">
-              <p>• Phải khởi tạo phòng họp trước khi có thể tham gia hoặc ghi nhận bắt đầu.</p>
-              <p>• Phải bấm <strong>Bắt đầu</strong> và <strong>Kết thúc</strong> buổi họp xác minh để hệ thống mở khóa chức năng nộp báo cáo thẩm định.</p>
-              <p>• Thời gian họp thực tế sẽ được lưu lại làm cơ sở nghiệm thu quy trình thẩm định.</p>
+              <p>• <strong>Trước giờ hẹn:</strong> Cho phép khởi tạo phòng trước; nút bắt đầu bị khóa kèm đồng hồ đếm ngược.</p>
+              <p>• <strong>Đến giờ hẹn:</strong> Nút "Bắt đầu và tham gia" tự động mở khóa và thực hiện trọn vẹn chuỗi kích hoạt.</p>
+              <p>• <strong>Đã bắt đầu:</strong> Chuyển sang "Tham gia lại", hệ thống không gọi lệnh bắt đầu thêm lần nào.</p>
+              <p>• <strong>Kết thúc:</strong> Xác nhận qua hộp thoại để chốt thời gian và mở khóa nộp báo cáo kết luận.</p>
             </div>
           </div>
         </div>
@@ -593,8 +883,8 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
               </div>
             </div>
 
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-              Sau khi kết thúc, thời điểm kết thúc sẽ được chốt trên hệ thống và bạn có thể chuyển ngay sang bước điền báo cáo kết luận thẩm định.
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+              Sau khi kết thúc, thời điểm kết thúc sẽ được chốt chính thức trên hệ thống. Các nút tham gia phòng họp sẽ được ẩn và hệ thống sẽ mở quyền nộp báo cáo kết luận thẩm định cho bạn.
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -610,8 +900,9 @@ export const VerificationMeetingPanel: React.FC<VerificationMeetingPanelProps> =
                 type="button"
                 disabled={actionLoading}
                 onClick={() => void handleConfirmEndMeeting()}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition disabled:opacity-50"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition disabled:opacity-50 inline-flex items-center gap-1.5"
               >
+                {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                 {actionLoading ? 'Đang kết thúc...' : 'Xác nhận Kết thúc'}
               </button>
             </div>

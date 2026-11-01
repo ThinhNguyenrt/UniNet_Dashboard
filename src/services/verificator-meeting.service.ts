@@ -53,6 +53,42 @@ export const getMeetingLifecycleStatus = (meeting: MeetingResponse | null): Meet
 };
 
 /**
+ * Tính số giây còn lại cho đến giờ hẹn bắt đầu
+ */
+export const getRemainingSeconds = (
+  scheduledStartAt: string | Date | null | undefined,
+  now = Date.now()
+): number => {
+  if (!scheduledStartAt) return 0;
+  const scheduledTime =
+    typeof scheduledStartAt === 'string'
+      ? new Date(scheduledStartAt).getTime()
+      : scheduledStartAt.getTime();
+  if (isNaN(scheduledTime)) return 0;
+  return Math.max(0, Math.floor((scheduledTime - now) / 1000));
+};
+
+/**
+ * Định dạng chuỗi đếm ngược thời gian chờ đến giờ họp
+ */
+export const formatCountdown = (diffSeconds: number): string => {
+  if (diffSeconds <= 0) return '00:00';
+  const days = Math.floor(diffSeconds / 86400);
+  const hours = Math.floor((diffSeconds % 86400) / 3600);
+  const minutes = Math.floor((diffSeconds % 3600) / 60);
+  const seconds = diffSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  if (days > 0) {
+    return `${days} ngày ${hours} giờ ${minutes} phút`;
+  }
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
+};
+
+/**
  * Định dạng thời lượng giữa 2 mốc thời gian
  */
 export const formatMeetingDuration = (
