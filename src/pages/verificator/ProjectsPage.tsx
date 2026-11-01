@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Calendar,
   AlertCircle,
+  FileText,
   Filter,
 } from 'lucide-react';
 import {
@@ -343,6 +344,26 @@ export const VerificatorProjectsPage: React.FC = () => {
                       {/* Thao tác */}
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/verificator/projects/${assignment.id}?tab=meeting`)}
+                            className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-700 text-slate-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1 transition"
+                            title="Truy cập phòng họp xác minh"
+                          >
+                            <Video className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="hidden md:inline">Phòng họp</span>
+                          </button>
+                          {assignment.status === VerificationAssignmentStatus.Completed && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/verificator/projects/${assignment.id}?tab=report`)}
+                              className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1 transition"
+                              title="Xem báo cáo thẩm định đã nộp"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span className="hidden md:inline">Báo cáo</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => navigate(`/verificator/projects/${assignment.id}`)}
