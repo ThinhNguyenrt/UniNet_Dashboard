@@ -21,6 +21,7 @@ import { AdminProjectsPage } from './pages/admin/ProjectsPage';
 import { StudentsPage } from './pages/verificator/StudentsPage';
 import { CompaniesPage } from './pages/verificator/CompaniesPage';
 import { VerificatorProjectsPage } from './pages/verificator/ProjectsPage';
+import { VerificatorProjectDetailPage } from './pages/verificator/ProjectDetailPage';
 import { VerificatorAvailabilityPage } from './pages/verificator/VerificatorAvailabilityPage';
 
 // Moderator Pages
@@ -115,6 +116,7 @@ export const App: React.FC = () => {
             <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
             <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
             <Route path="projects" element={<VerificatorProjectsPage />} />
+            <Route path="projects/:id" element={<VerificatorProjectDetailPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
 
