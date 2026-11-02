@@ -1,13 +1,12 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { X, LogOut, Shield, Megaphone } from 'lucide-react';
+import { X, LogOut, Shield } from 'lucide-react';
 import logoImg from '../../assets/logo.jpg';
 import { useAuth } from '../../context/AuthContext';
 import { roleNavigationConfig } from '../../data/navigation';
 import { SidebarItem } from './SidebarItem';
 import { useNotifications } from '../../context/notifications-context';
 import { useAdminManagement } from '../../context/admin-management-context';
-import { GraduationCap, Building2, Users } from 'lucide-react';
 import type { NavigationItem } from '../../types/navigation';
 
 interface SidebarProps {
@@ -19,24 +18,45 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = false }) => {
   const { currentUser, logout } = useAuth();
   const location = useLocation();
-  const { canManage } = useNotifications();
+  const { unreadCount } = useNotifications();
   const access = useAdminManagement();
 
   if (!currentUser) return null;
 
-  const prefix = '/' + currentUser.role;
-  // Keep Admin navigation discoverable while capabilities are unavailable;
-  // page guards and backend permissions still control access to all data/actions.
-  const canNavigate = (permission: string) => access.has(permission) || (currentUser.role === 'admin' && access.capabilities === null);
-  const scopes: Record<string, string> = { 'admin-revenue': 'finance.view', 'admin-project-moderation': 'project.review', 'admin-job-postings': 'recruitment.review', 'admin-community-posts': 'community.review', 'admin-staff': 'staff.manage', 'admin-projects': 'verification.evidence.review', 'moderator-projects': 'project.review', 'moderator-job-postings': 'recruitment.review', 'moderator-community-posts': 'community.review', 'assessor-projects': 'verification.evidence.review' };
-  const system: NavigationItem[] = (roleNavigationConfig[currentUser.role] || []).filter(item => item.id !== 'verificator-users-group' && (!scopes[item.id] || canNavigate(scopes[item.id]))).map(item => ({ ...item, section: 'Qu\u1ea3n l\u00fd h\u1ec7 th\u1ed1ng' }));
-  if (currentUser.role === 'accountant' && canNavigate('finance.view')) system.unshift({ id: 'finance', label: 'T\u00e0i ch\u00ednh', path: '/accountant/finance', icon: Shield, section: 'T\u00e0i ch\u00ednh' });
-  if (canNavigate('users.view')) system.splice(currentUser.role === 'admin' ? 1 : 0, 0, { id: 'managed-users', label: 'Người dùng', path: prefix + '/users', icon: Users, section: 'Quản lý hệ thống' });
-  const reviews: NavigationItem[] = [
-    ...(canNavigate('verification.student.review') ? [{ id: 'student-review', label: 'Xác minh sinh viên', path: prefix + '/student-verifications', icon: GraduationCap, section: 'Kiểm duyệt & xác minh' }] : []),
-    ...(canNavigate('verification.partner.review') ? [{ id: 'partner-review', label: 'Xác minh đối tác', path: prefix + '/partner-verifications', icon: Building2, section: 'Kiểm duyệt & xác minh' }] : []),
-  ];
-  const navItems: NavigationItem[] = [...system, ...reviews, ...(canManage && currentUser.role === 'admin' ? [{ id: 'notification-broadcasts', label: 'Thông báo hệ thống', path: '/admin/notification-broadcasts', icon: Megaphone, section: 'Thông báo' }] : [])];
+  // Quyền truy cập: nếu backend capabilities null (chưa tải xong hoặc offline), mặc định hiển thị để phát hiện menu
+  const canNavigate = (permission: string) =>
+    access.has(permission) || access.capabilities === null;
+
+  const scopes: Record<string, string> = {
+    'admin-users': 'users.view',
+    'admin-staff': 'staff.manage',
+    'accountant-statistics': 'finance.view',
+    'accountant-withdrawals': 'finance.view',
+  };
+
+  const rawItems = roleNavigationConfig[currentUser.role] || [];
+
+  const navItems: NavigationItem[] = rawItems
+    .filter(item => {
+      const scope = scopes[item.id];
+      if (scope) {
+        return canNavigate(scope);
+      }
+      return true;
+    })
+    .map(item => {
+      // Gắn badge động
+      if (item.id === 'verifier-student-verifications' && (access.capabilities?.pendingStudents ?? 0) > 0) {
+        return { ...item, badge: String(access.capabilities!.pendingStudents) };
+      }
+      if (item.id === 'verifier-partner-verifications' && (access.capabilities?.pendingPartners ?? 0) > 0) {
+        return { ...item, badge: String(access.capabilities!.pendingPartners) };
+      }
+      if (item.path?.includes('/notifications') && unreadCount > 0) {
+        return { ...item, badge: String(unreadCount) };
+      }
+      return item;
+    });
 
   return (
     <>
@@ -76,6 +96,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : currentUser.role === 'verifier'
                       ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                      : currentUser.role === 'accountant'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                   }`}
                 >
@@ -99,19 +121,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
 
         {/* Danh sách mục điều hướng theo vai trò */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
-          {navItems.map((item, index) => (
-            <React.Fragment key={item.id}>
-            {(index === 0 || item.section !== navItems[index - 1].section) && <div className={'px-3 pb-2 pt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 ' + (collapsed ? 'lg:sr-only' : '')}>{item.section}</div>}
-            <div className={collapsed ? 'lg:hidden' : ''}>
-            <SidebarItem
-              item={item}
-              currentPath={location.pathname}
-              onNavigate={onClose}
-            />
-            </div>
-            {collapsed && <NavLink to={item.path || '#'} title={item.label} aria-label={item.label} className={({ isActive }) => 'relative hidden min-h-11 items-center justify-center rounded-xl lg:flex ' + (isActive ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-blue-50')}><item.icon size={19} />{item.badge && <span className="absolute -right-1 -top-1 rounded-full bg-blue-100 px-1 text-[10px] text-blue-800">{item.badge}</span>}</NavLink>}
-            </React.Fragment>
-          ))}
+          {navItems.map((item, index) => {
+            const isFirstOfSection = index === 0 || item.section !== navItems[index - 1].section;
+            const SectionIcon = item.sectionIcon;
+            return (
+              <React.Fragment key={item.id}>
+                {isFirstOfSection && item.section && (
+                  <div className={'px-3 pt-3 pb-2 ' + (collapsed ? 'lg:sr-only' : '')}>
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {SectionIcon && <SectionIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />}
+                      <span className="truncate">{item.section}</span>
+                    </div>
+                  </div>
+                )}
+                <div className={collapsed ? 'lg:hidden' : ''}>
+                  <SidebarItem
+                    item={item}
+                    currentPath={location.pathname}
+                    onNavigate={onClose}
+                  />
+                </div>
+                {collapsed && (
+                  <NavLink
+                    to={item.path || '#'}
+                    title={item.label}
+                    aria-label={item.label}
+                    aria-current={location.pathname === item.path ? 'page' : undefined}
+                    className={({ isActive }) =>
+                      'relative hidden min-h-11 items-center justify-center rounded-xl lg:flex transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 ' +
+                      (isActive
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900')
+                    }
+                  >
+                    <item.icon size={19} />
+                    {item.badge && (
+                      <span className="absolute -right-1 -top-1 rounded-full bg-blue-100 px-1 text-[10px] text-blue-800">
+                        {item.badge}
+                      </span>
+                    )}
+                  </NavLink>
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
 
         {/* Thông tin tài khoản người dùng & Đăng xuất ở chân Sidebar */}
@@ -141,7 +194,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
             </button>
           </div>
         </div>
-        {collapsed && <button type="button" onClick={logout} aria-label="Đăng xuất" title="Đăng xuất" className="mx-3 mb-4 hidden min-h-11 items-center justify-center rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 lg:flex"><LogOut size={19} /></button>}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={logout}
+            aria-label="Đăng xuất"
+            title="Đăng xuất"
+            className="mx-3 mb-4 hidden min-h-11 items-center justify-center rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 lg:flex"
+          >
+            <LogOut size={19} />
+          </button>
+        )}
       </aside>
     </>
   );

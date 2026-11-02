@@ -10,6 +10,7 @@ export interface NavigationSubItem {
 
 export interface NavigationItem {
   section?: string;
+  sectionIcon?: LucideIcon;
   permission?: string;
   id: string;
   label: string;

@@ -1,10 +1,46 @@
 import type { UserRole } from '../types/auth';
 
 const routes: Record<UserRole, readonly string[]> = {
-  admin: ['/admin/projects', '/admin/staff', '/admin/service-packages', '/admin/skills', '/admin/revenue', '/admin/notifications', '/admin/notification-broadcasts', '/admin/student-verifications', '/admin/partner-verifications', '/admin/job-postings', '/admin/community-posts'],
-  verifier: ['/verifier/notifications', '/verifier/student-verifications', '/verifier/partner-verifications'],
-  accountant: ['/accountant/notifications', '/accountant/finance'],
-  moderator: ['/moderator/projects', '/moderator/job-postings', '/moderator/career-profiles', '/moderator/community-posts', '/moderator/advertisements', '/moderator/notifications'],
+  admin: [
+    '/admin/users',
+    '/admin/staff',
+    '/admin/advertisements',
+    '/admin/notifications',
+    '/admin/activity-logs',
+    '/admin/skills',
+    '/admin/projects',
+    '/admin/service-packages',
+    '/admin/revenue',
+    '/admin/notification-broadcasts',
+    '/admin/student-verifications',
+    '/admin/partner-verifications',
+    '/admin/job-postings',
+    '/admin/community-posts',
+  ],
+  verifier: [
+    '/verifier/student-verifications',
+    '/verifier/partner-verifications',
+    '/verifier/notifications',
+    '/verifier/activity-logs',
+  ],
+  accountant: [
+    '/accountant/statistics',
+    '/accountant/withdrawals',
+    '/accountant/financial-settings',
+    '/accountant/notifications',
+    '/accountant/activity-logs',
+    '/accountant/finance',
+  ],
+  moderator: [
+    '/moderator/projects',
+    '/moderator/community-posts',
+    '/moderator/complaints',
+    '/moderator/notifications',
+    '/moderator/activity-logs',
+    '/moderator/job-postings',
+    '/moderator/career-profiles',
+    '/moderator/advertisements',
+  ],
 };
 
 // Only known dashboard routes returned by the authorized target API may be opened.

@@ -32,7 +32,7 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
     }
   }, [isAnyChildActive]);
 
-  // Trường hợp 1: Nhóm có danh mục con lồng nhau (Nested navigation group - ví dụ: "Người dùng")
+  // Trường hợp 1: Nhóm có danh mục con lồng nhau
   if (hasChildren) {
     const Icon = item.icon;
     return (
@@ -41,7 +41,7 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group select-none ${
+          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
             isAnyChildActive
               ? 'text-blue-700 bg-blue-50/80 font-semibold'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
@@ -73,8 +73,9 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
                   key={child.id}
                   to={child.path}
                   onClick={onNavigate}
+                  aria-current={currentPath === child.path ? 'page' : undefined}
                   className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       isActive
                         ? 'bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
@@ -96,12 +97,15 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
 
   // Trường hợp 2: Mục điều hướng đơn
   const Icon = item.icon;
+  const isSelected = item.path ? (currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path + '/'))) : false;
+
   return (
     <NavLink
       to={item.path || '#'}
       onClick={onNavigate}
+      aria-current={isSelected ? 'page' : undefined}
       className={({ isActive }) =>
-        `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group select-none ${
+        `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
           isActive
             ? 'bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/25'
             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
@@ -109,12 +113,12 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
       }
     >
       <div className="flex items-center gap-3 min-w-0">
-        <Icon className="w-4 h-4 flex-shrink-0 transition-colors" />
+        <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
         <span className="truncate">{item.label}</span>
       </div>
 
       {item.badge && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase bg-slate-200/60 text-slate-600">
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/60 text-slate-600'}`}>
           {item.badge}
         </span>
       )}
