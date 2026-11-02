@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 import { roleNavigationConfig } from '../../data/navigation';
 import { SidebarItem } from './SidebarItem';
 import { useAdminManagement } from '../../context/admin-management-context';
-import { useNotifications } from '../../context/notifications-context';
 import type { NavigationItem } from '../../types/navigation';
 
 interface SidebarProps {
@@ -19,7 +18,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
   const { currentUser, logout } = useAuth();
   const location = useLocation();
   const access = useAdminManagement();
-  const { unreadCount } = useNotifications();
 
   if (!currentUser) return null;
 
@@ -39,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
     'admin-job-postings': 'recruitment.review',
     'admin-community-posts': 'community.review',
     'admin-projects': 'verification.evidence.review',
+    'admin-notification-broadcasts': 'notifications.manage',
     'accountant-statistics': 'finance.view',
     'accountant-withdrawals': 'finance.view',
   };
@@ -67,9 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
         (access.capabilities?.pendingPartners ?? 0) > 0
       ) {
         return { ...item, badge: String(access.capabilities!.pendingPartners) };
-      }
-      if (item.path?.includes('/notifications') && unreadCount > 0) {
-        return { ...item, badge: String(unreadCount) };
       }
       return item;
     });

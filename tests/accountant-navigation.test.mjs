@@ -94,8 +94,9 @@ test('admin sidebar has exactly the 14 items across 4 sections matching referenc
   assert.equal(ads.path, '/admin/advertisements');
   assert.equal(ads.section, 'HỆ THỐNG');
 
+  // "Thông báo" trong admin sidebar là trang tạo/phát thông báo (/admin/notification-broadcasts)
   assert.equal(notifications.label, 'Thông báo');
-  assert.equal(notifications.path, '/admin/notifications');
+  assert.equal(notifications.path, '/admin/notification-broadcasts');
   assert.equal(notifications.section, 'HỆ THỐNG');
 
   assert.equal(activityLogs.label, 'Nhật ký hoạt động');
@@ -171,6 +172,7 @@ test('role paths are correctly recognized and allowed', () => {
   assert.equal(isPathAllowedForRole('/admin/withdrawals', 'admin'), true);
   assert.equal(isPathAllowedForRole('/admin/financial-settings', 'admin'), true);
   assert.equal(isPathAllowedForRole('/admin/complaints', 'admin'), true);
+  assert.equal(isPathAllowedForRole('/admin/notification-broadcasts', 'admin'), true);
   assert.equal(isPathAllowedForRole('/admin/staff', 'accountant'), false);
   assert.equal(isPathAllowedForRole('/moderator/projects', 'accountant'), false);
   assert.equal(isPathAllowedForRole('/moderator/complaints', 'moderator'), true);
@@ -189,6 +191,7 @@ test('safeNotificationTarget allows valid routes for each role and disallows una
   assert.equal(safeNotificationTarget('/admin/complaints', 'admin'), '/admin/complaints');
   assert.equal(safeNotificationTarget('/admin/statistics', 'admin'), '/admin/statistics');
   assert.equal(safeNotificationTarget('/admin/withdrawals', 'admin'), '/admin/withdrawals');
+  assert.equal(safeNotificationTarget('/admin/notification-broadcasts', 'admin'), '/admin/notification-broadcasts');
   assert.equal(safeNotificationTarget('/admin/staff', 'accountant'), null);
 });
 

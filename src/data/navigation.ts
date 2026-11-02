@@ -61,7 +61,7 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
     },
   ],
 
-  // 2. Quản trị viên (Admin - Theo đúng hình ảnh thiết kế chuẩn)
+  // 2. Quản trị viên (Admin - Theo đúng thiết kế chuẩn, "Thông báo" là trang tạo/phát thông báo hệ thống)
   admin: [
     // Section: QUẢN LÝ & XÁC MINH
     {
@@ -159,9 +159,9 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
       sectionIcon: Settings,
     },
     {
-      id: 'admin-notifications',
-      label: 'Thông báo',
-      path: '/admin/notifications',
+      id: 'admin-notification-broadcasts',
+      label: 'Thông báo hệ thống',
+      path: '/admin/notification-broadcasts',
       icon: Bell,
       section: 'HỆ THỐNG',
       sectionIcon: Settings,
