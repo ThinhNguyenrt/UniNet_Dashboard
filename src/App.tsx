@@ -84,25 +84,33 @@ export const App: React.FC = () => {
             <Route path="users" element={<UsersPage />} />
             <Route path="users/:id" element={<UserDetailPage />} />
             <Route path="staff" element={<StaffPage />} />
-            <Route path="advertisements" element={<AdvertisementsPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="activity-logs" element={<ActivityLogsPage />} />
-            <Route path="skills" element={<SkillsPage />} />
-
-            {/* Các route phụ trợ mở rộng của Admin */}
-            <Route path="revenue" element={<FinancePage />} />
-            <Route path="finance" element={<FinancePage />} />
-            <Route path="service-packages" element={<ServicePackagesPage />} />
-            <Route path="projects" element={<AdminProjectsPage />} />
-            <Route path="notification-broadcasts" element={<NotificationBroadcastsPage />} />
             <Route path="student-verifications" element={<AccountVerificationsPage kind="student" />} />
             <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
             <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
             <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
+
+            {/* Kiểm duyệt */}
             <Route path="project-moderation" element={<ModeratorProjectsPage />} />
+            <Route path="community-posts" element={<CommunityPostsPage />} />
+            <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="career-profiles" element={<CareerProfilesPage />} />
             <Route path="job-postings" element={<JobPostingsPage />} />
-            <Route path="community-posts" element={<CommunityPostsPage />} />
+            <Route path="projects" element={<AdminProjectsPage />} />
+
+            {/* Tài chính & Kế toán */}
+            <Route path="statistics" element={<AccountantStatisticsPage />} />
+            <Route path="withdrawals" element={<AccountantWithdrawalsPage />} />
+            <Route path="financial-settings" element={<AccountantSettingsPage />} />
+            <Route path="revenue" element={<FinancePage />} />
+            <Route path="finance" element={<FinancePage />} />
+
+            {/* Hệ thống */}
+            <Route path="advertisements" element={<AdvertisementsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notification-broadcasts" element={<NotificationBroadcastsPage />} />
+            <Route path="activity-logs" element={<ActivityLogsPage />} />
+            <Route path="skills" element={<SkillsPage />} />
+            <Route path="service-packages" element={<ServicePackagesPage />} />
           </Route>
 
           {/* Phân vùng Moderator */}
