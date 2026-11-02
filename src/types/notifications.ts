@@ -27,7 +27,7 @@ export interface BroadcastInput {
   title: string;
   message: string;
   audience: 'All' | 'Role' | 'Selected';
-  role?: 'Student' | 'Partner' | 'Admin' | 'Moderator' | 'Verificator';
+  role?: 'Student' | 'Partner' | 'Admin' | 'Moderator' | 'Assessor' | 'Verifier' | 'Accountant';
   recipientAccountIds?: string[];
   targetUrl?: string;
   expiresAt?: string;

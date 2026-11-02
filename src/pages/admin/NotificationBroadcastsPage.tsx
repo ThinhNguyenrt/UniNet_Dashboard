@@ -8,7 +8,7 @@ import type { BroadcastInput, NotificationBroadcast } from '../../types/notifica
 import { notificationDate } from '../../utils/notification-targets';
 
 const labels: Record<NotificationBroadcast['status'], string> = { Draft: 'Bản nháp', Queued: 'Đang chờ gửi', Processing: 'Đang xử lý', Completed: 'Hoàn tất', Cancelled: 'Đã hủy', Failed: 'Gửi thất bại' };
-const roles = [{ value: 'Student', label: 'Sinh viên' }, { value: 'Partner', label: 'Đối tác' }, { value: 'Admin', label: 'Quản trị viên' }, { value: 'Moderator', label: 'Kiểm duyệt viên' }, { value: 'Verificator', label: 'Xác minh viên' }] as const;
+const roles = [{ value: 'Student', label: 'Sinh viên' }, { value: 'Partner', label: 'Đối tác' }, { value: 'Assessor', label: 'Chuyên gia thẩm định' }, { value: 'Verifier', label: 'Nhân viên xác minh' }, { value: 'Moderator', label: 'Nhân viên kiểm duyệt' }, { value: 'Accountant', label: 'Kế toán' }, { value: 'Admin', label: 'Quản trị viên' }] as const;
 const inputClass = 'min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-blue-500';
 
 export function NotificationBroadcastsPage() {

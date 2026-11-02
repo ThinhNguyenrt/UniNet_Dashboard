@@ -82,7 +82,7 @@ export const VerificatorProjectDetailPage: React.FC = () => {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3 text-slate-400 text-sm">
-          <Link to="/verificator/projects" className="inline-flex items-center gap-1.5 hover:text-slate-600">
+          <Link to="/assessor/projects" className="inline-flex items-center gap-1.5 hover:text-slate-600">
             <ArrowLeft className="w-4 h-4" />
             Danh sách phân công
           </Link>
@@ -102,7 +102,7 @@ export const VerificatorProjectDetailPage: React.FC = () => {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3 text-slate-400 text-sm">
-          <Link to="/verificator/projects" className="inline-flex items-center gap-1.5 hover:text-slate-600">
+          <Link to="/assessor/projects" className="inline-flex items-center gap-1.5 hover:text-slate-600">
             <ArrowLeft className="w-4 h-4" />
             Danh sách phân công
           </Link>
@@ -123,7 +123,7 @@ export const VerificatorProjectDetailPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/verificator/projects')}
+                onClick={() => navigate('/assessor/projects')}
                 className="px-3.5 py-1.5 bg-white border border-red-200 text-red-700 rounded-xl text-xs font-semibold hover:bg-red-50"
               >
                 Quay lại danh sách
@@ -156,7 +156,7 @@ export const VerificatorProjectDetailPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Link
-            to="/verificator/projects"
+            to="/assessor/projects"
             className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-medium"
           >
             <ArrowLeft className="w-4 h-4" />

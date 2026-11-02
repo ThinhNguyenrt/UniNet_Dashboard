@@ -275,7 +275,7 @@ export const VerificatorProjectsPage: React.FC = () => {
                   return (
                     <tr
                       key={assignment.id}
-                      onClick={() => navigate(`/verificator/projects/${assignment.id}`)}
+                      onClick={() => navigate(`/assessor/projects/${assignment.id}`)}
                       className="hover:bg-slate-50/80 transition cursor-pointer"
                     >
                       {/* Hồ sơ thẩm định */}
@@ -346,7 +346,7 @@ export const VerificatorProjectsPage: React.FC = () => {
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            onClick={() => navigate(`/verificator/projects/${assignment.id}?tab=meeting`)}
+                            onClick={() => navigate(`/assessor/projects/${assignment.id}?tab=meeting`)}
                             className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-700 text-slate-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1 transition"
                             title="Truy cập phòng họp xác minh"
                           >
@@ -356,7 +356,7 @@ export const VerificatorProjectsPage: React.FC = () => {
                           {assignment.status === VerificationAssignmentStatus.Completed && (
                             <button
                               type="button"
-                              onClick={() => navigate(`/verificator/projects/${assignment.id}?tab=report`)}
+                              onClick={() => navigate(`/assessor/projects/${assignment.id}?tab=report`)}
                               className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1 transition"
                               title="Xem báo cáo thẩm định đã nộp"
                             >
@@ -366,7 +366,7 @@ export const VerificatorProjectsPage: React.FC = () => {
                           )}
                           <button
                             type="button"
-                            onClick={() => navigate(`/verificator/projects/${assignment.id}`)}
+                            onClick={() => navigate(`/assessor/projects/${assignment.id}`)}
                             className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1 transition"
                           >
                             <span>Xem chi tiết</span>

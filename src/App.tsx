@@ -11,18 +11,13 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 
 // Admin Pages
-import { RevenuePage } from './pages/admin/RevenuePage';
+import { FinancePage } from './pages/admin/FinancePage';
 import { StaffPage } from './pages/admin/StaffPage';
 import { ServicePackagesPage } from './pages/admin/ServicePackagesPage';
 import { SkillsPage } from './pages/admin/SkillsPage';
 import { AdminProjectsPage } from './pages/admin/ProjectsPage';
 
 // Verificator Pages
-import { StudentsPage } from './pages/verificator/StudentsPage';
-import { CompaniesPage } from './pages/verificator/CompaniesPage';
-import { VerificatorProjectsPage } from './pages/verificator/ProjectsPage';
-import { VerificatorProjectDetailPage } from './pages/verificator/ProjectDetailPage';
-import { VerificatorAvailabilityPage } from './pages/verificator/VerificatorAvailabilityPage';
 
 // Moderator Pages
 import { ModeratorProjectsPage } from './pages/moderator/ProjectsPage';
@@ -79,7 +74,8 @@ export const App: React.FC = () => {
             }
           >
             <Route index element={<Navigate to="/admin/revenue" replace />} />
-            <Route path="revenue" element={<RevenuePage />} />
+            <Route path="revenue" element={<FinancePage />} />
+            <Route path="finance" element={<FinancePage />} />
             <Route path="staff" element={<StaffPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="users/:id" element={<UserDetailPage />} />
@@ -92,33 +88,15 @@ export const App: React.FC = () => {
             <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
             <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
             <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
+            <Route path="project-moderation" element={<ModeratorProjectsPage />} />
+            <Route path="advertisements" element={<AdvertisementsPage />} />
+            <Route path="career-profiles" element={<CareerProfilesPage />} />
             <Route path="job-postings" element={<JobPostingsPage />} />
             <Route path="community-posts" element={<CommunityPostsPage />} />
           </Route>
 
           {/* Phân vùng Verificator */}
-          <Route
-            path="/verificator"
-            element={
-              <ProtectedRoute allowedRoles={['verificator']}>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/verificator/availability" replace />} />
-            <Route path="availability" element={<VerificatorAvailabilityPage />} />
-            <Route path="students" element={<StudentsPage />} />
-            <Route path="companies" element={<CompaniesPage />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="users/:id" element={<UserDetailPage />} />
-            <Route path="student-verifications" element={<AccountVerificationsPage kind="student" />} />
-            <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
-            <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
-            <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
-            <Route path="projects" element={<VerificatorProjectsPage />} />
-            <Route path="projects/:id" element={<VerificatorProjectDetailPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-          </Route>
+
 
           {/* Phân vùng Moderator */}
           <Route
@@ -144,6 +122,21 @@ export const App: React.FC = () => {
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
 
+          <Route path="/accountant" element={<ProtectedRoute allowedRoles={['accountant']}><DashboardLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="finance" replace />} />
+            <Route path="finance" element={<FinancePage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+          </Route>
+          <Route path="/verifier" element={<ProtectedRoute allowedRoles={['verifier']}><DashboardLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="student-verifications" replace />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="users/:id" element={<UserDetailPage />} />
+            <Route path="student-verifications" element={<AccountVerificationsPage kind="student" />} />
+            <Route path="student-verifications/:id" element={<AccountVerificationDetailPage kind="student" />} />
+            <Route path="partner-verifications" element={<AccountVerificationsPage kind="partner" />} />
+            <Route path="partner-verifications/:id" element={<AccountVerificationDetailPage kind="partner" />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+          </Route>
           {/* Fallback 404 cho mọi route không xác định */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

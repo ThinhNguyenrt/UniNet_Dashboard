@@ -4,6 +4,10 @@ export const adminPermissions = {
   staffManage: 'staff.manage', permissionsManage: 'permissions.manage',
 } as const;
 export const permissionLabels: Record<string, string> = {
+  'finance.view': 'Xem giao dịch và báo cáo tài chính', 'finance.wallet.credit': 'Ghi nhận thu nhập vào ví',
+  'finance.refund.create': 'Tạo yêu cầu hoàn tiền', 'finance.refund.review': 'Duyệt yêu cầu hoàn tiền',
+  'finance.withdrawal.review': 'Duyệt yêu cầu rút tiền', 'finance.payout.create': 'Lập lệnh chi',
+  'finance.payout.confirm': 'Xác nhận kết quả chuyển khoản', 'finance.report.export': 'Xuất báo cáo tài chính',
   'users.view': 'Xem người dùng', 'users.detail': 'Xem chi tiết người dùng', 'users.lock': 'Khóa tài khoản', 'users.unlock': 'Mở khóa tài khoản',
   'verification.student.review': 'Xem và xét duyệt sinh viên', 'verification.partner.review': 'Xem và xét duyệt đối tác',
   'project.review': 'Kiểm duyệt dự án', 'recruitment.review': 'Kiểm duyệt tuyển dụng', 'verification.evidence.review': 'Xác minh minh chứng',
@@ -24,7 +28,7 @@ export interface VerificationDocument { index: number; fileName: string; content
 export interface VerificationDetail { application: VerificationItem; profile: PublicProfile; submittedData: Record<string, string | null>; documents: VerificationDocument[]; history: VerificationHistory[]; rejectReason: string | null; isVerified: boolean }
 export interface PermissionEntry { permission: string; granted: boolean; override: boolean | null }
 export type VerificationKind = 'student' | 'partner';
-export const roleLabels = ['Sinh viên', 'Đối tác', 'Admin', 'Kiểm duyệt viên', 'Xác minh viên'];
+export const roleLabels = ['Sinh vi\u00ean', '\u0110\u1ed1i t\u00e1c', 'Chuy\u00ean gia th\u1ea9m \u0111\u1ecbnh', 'Nh\u00e2n vi\u00ean x\u00e1c minh', 'Nh\u00e2n vi\u00ean ki\u1ec3m duy\u1ec7t', 'K\u1ebf to\u00e1n', 'Qu\u1ea3n tr\u1ecb vi\u00ean'];
 export const accountStatusLabels = ['Chờ kích hoạt', 'Đang hoạt động', 'Đã khóa', 'Đã xóa'];
 export const verificationStatusLabels = ['Chờ duyệt', 'Đã duyệt', 'Từ chối', 'Đã hủy'];
 export const partnerTypeLabels = ['Doanh nghiệp', 'Trường học', 'Cửa hàng', 'Trung tâm đào tạo', 'Khác'];

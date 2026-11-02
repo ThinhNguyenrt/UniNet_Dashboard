@@ -3,7 +3,7 @@ export interface MockAccount {
   name: string;
   email: string;
   password: string;
-  role: 'admin' | 'verificator' | 'moderator';
+  role: 'admin' | 'moderator';
   roleName: string;
   description: string;
   avatar?: string;
@@ -19,15 +19,7 @@ export const mockAccounts: MockAccount[] = [
     roleName: 'Admin (Quản trị viên)',
     description: 'Toàn quyền cấu hình hệ thống, quản lý người dùng và phân quyền'
   },
-  {
-    id: 'acc-verificator',
-    name: 'Chuyên viên Xác thực',
-    email: 'verificator@gmail.com',
-    password: '123456',
-    role: 'verificator',
-    roleName: 'Verificator (Xác thực viên)',
-    description: 'Kiểm tra hồ sơ sinh viên, thông tin trường và cấp tích xanh'
-  },
+
   {
     id: 'acc-moderator',
     name: 'Kiểm duyệt viên Cộng đồng',

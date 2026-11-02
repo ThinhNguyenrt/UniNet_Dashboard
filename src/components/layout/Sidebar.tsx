@@ -28,7 +28,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
   // Keep Admin navigation discoverable while capabilities are unavailable;
   // page guards and backend permissions still control access to all data/actions.
   const canNavigate = (permission: string) => access.has(permission) || (currentUser.role === 'admin' && access.capabilities === null);
-  const system: NavigationItem[] = (roleNavigationConfig[currentUser.role] || []).filter(item => item.id !== 'verificator-users-group' && (item.id !== 'admin-staff' || canNavigate('users.view'))).map(item => ({ ...item, section: 'Quản lý hệ thống' }));
+  const scopes: Record<string, string> = { 'admin-revenue': 'finance.view', 'admin-project-moderation': 'project.review', 'admin-job-postings': 'recruitment.review', 'admin-community-posts': 'community.review', 'admin-staff': 'staff.manage', 'admin-projects': 'verification.evidence.review', 'moderator-projects': 'project.review', 'moderator-job-postings': 'recruitment.review', 'moderator-community-posts': 'community.review', 'assessor-projects': 'verification.evidence.review' };
+  const system: NavigationItem[] = (roleNavigationConfig[currentUser.role] || []).filter(item => item.id !== 'verificator-users-group' && (!scopes[item.id] || canNavigate(scopes[item.id]))).map(item => ({ ...item, section: 'Qu\u1ea3n l\u00fd h\u1ec7 th\u1ed1ng' }));
+  if (currentUser.role === 'accountant' && canNavigate('finance.view')) system.unshift({ id: 'finance', label: 'T\u00e0i ch\u00ednh', path: '/accountant/finance', icon: Shield, section: 'T\u00e0i ch\u00ednh' });
   if (canNavigate('users.view')) system.splice(currentUser.role === 'admin' ? 1 : 0, 0, { id: 'managed-users', label: 'Người dùng', path: prefix + '/users', icon: Users, section: 'Quản lý hệ thống' });
   const reviews: NavigationItem[] = [
     ...(canNavigate('verification.student.review') ? [{ id: 'student-review', label: 'Xác minh sinh viên', path: prefix + '/student-verifications', icon: GraduationCap, section: 'Kiểm duyệt & xác minh' }] : []),
@@ -72,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                     currentUser.role === 'admin'
                       ? 'bg-red-50 text-red-600 border border-red-200'
-                      : currentUser.role === 'verificator'
+                      : currentUser.role === 'verifier'
                       ? 'bg-blue-50 text-blue-600 border border-blue-200'
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                   }`}

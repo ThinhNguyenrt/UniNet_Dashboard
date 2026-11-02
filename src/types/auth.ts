@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'verificator' | 'moderator';
+export type UserRole = 'admin' | 'verifier' | 'moderator' | 'accountant';
 
 // Thông tin hồ sơ người dùng trả về từ API
 export interface UserProfile {

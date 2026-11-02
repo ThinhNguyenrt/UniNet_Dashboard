@@ -1,3 +1,5 @@
+import type { Account } from '../types/auth';
+import { dashboardRole, isDashboardRole } from '../utils/dashboard-role-access';
 import apiClient from './api';
 import { SESSION_GENERATION_KEY } from './dashboard-session';
 import type {
@@ -65,15 +67,12 @@ export const mapRole = (
   }
 
   // Khớp vai trò phù hợp với phân hệ dashboard
-  if (roleStr.includes('admin') || roleStr === '2') {
-    return { role: 'admin', roleName: 'Admin (Quản trị viên)' };
+  const role = dashboardRole(roleStr);
+  if (role) {
+    const roleNames = { admin: 'Qu\u1ea3n tr\u1ecb vi\u00ean', verifier: 'Nh\u00e2n vi\u00ean x\u00e1c minh', moderator: 'Nh\u00e2n vi\u00ean ki\u1ec3m duy\u1ec7t', accountant: 'K\u1ebf to\u00e1n' };
+    return { role, roleName: roleNames[role] };
   }
-  if (roleStr.includes('verif') || roleStr === '4') {
-    return { role: 'verificator', roleName: 'Verificator (Xác thực viên)' };
-  }
-  if (roleStr.includes('mod') || roleStr === '3') {
-    return { role: 'moderator', roleName: 'Moderator (Kiểm duyệt viên)' };
-  }
+  if (['2', 'assessor', 'verificator'].includes(roleStr)) throw new Error('Th\u1ea9m \u0111\u1ecbnh vi\u00ean vui l\u00f2ng \u0111\u0103ng nh\u1eadp tr\u00ean \u1ee9ng d\u1ee5ng UniNet.');
 
   throw new Error('Tài khoản không có quyền truy cập bảng điều khiển quản trị.');
 };
@@ -159,8 +158,16 @@ export const authService = {
   getStoredUser: (): User | null => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.USER);
-      return stored ? (JSON.parse(stored) as User) : null;
+      if (!stored) return null;
+      const user = JSON.parse(stored) as User;
+      const latestAccount = localStorage.getItem(STORAGE_KEYS.ACCOUNT);
+      const account = latestAccount ? JSON.parse(latestAccount) as Account : user.account;
+      // Cached presentation roles may predate the persisted role migration.
+      const resolved = mapRole(account?.role ?? user.rawRole ?? user.role, localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) ?? '');
+      if (!isDashboardRole(resolved.role)) { authService.clearAuthData(); return null; }
+      return { ...user, role: resolved.role, roleName: resolved.roleName, account: account ?? user.account };
     } catch {
+      authService.clearAuthData();
       return null;
     }
   },

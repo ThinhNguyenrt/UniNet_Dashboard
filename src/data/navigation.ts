@@ -4,13 +4,10 @@ import {
   Package,
   Award,
   FolderKanban,
-  GraduationCap,
-  Building2,
   Briefcase,
   FileText,
   MessageSquare,
   Megaphone,
-  CalendarClock,
 } from 'lucide-react';
 import type { NavigationItem } from '../types/navigation';
 import type { UserRole } from '../types/auth';
@@ -19,10 +16,17 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
   admin: [
     {
       id: 'admin-revenue',
-      label: 'Doanh thu',
+      label: 'T\u00e0i ch\u00ednh',
       path: '/admin/revenue',
       icon: TrendingUp,
     },
+    { id: 'admin-project-moderation', label: 'Ki\u1ec3m duy\u1ec7t d\u1ef1 \u00e1n', path: '/admin/project-moderation', icon: FolderKanban },
+    { id: 'admin-job-postings', label: 'Ki\u1ec3m duy\u1ec7t tuy\u1ec3n d\u1ee5ng', path: '/admin/job-postings', icon: Briefcase },
+    { id: 'admin-community-posts', label: 'Ki\u1ec3m duy\u1ec7t c\u1ed9ng \u0111\u1ed3ng', path: '/admin/community-posts', icon: MessageSquare },
+    { id: 'admin-advertisements', label: 'Qu\u1ea3ng c\u00e1o', path: '/admin/advertisements', icon: Megaphone },
+    { id: 'admin-career-profiles', label: 'H\u1ed3 s\u01a1 ngh\u1ec1 nghi\u1ec7p', path: '/admin/career-profiles', icon: FileText },
+
+
     {
       id: 'admin-staff',
       label: 'Nhân viên',
@@ -49,40 +53,8 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
     },
   ],
 
-  verificator: [
-    {
-      id: 'verificator-users-group',
-      label: 'Người dùng',
-      icon: Users,
-      children: [
-        {
-          id: 'verificator-students',
-          label: 'Sinh viên',
-          path: '/verificator/students',
-          icon: GraduationCap,
-        },
-        {
-          id: 'verificator-companies',
-          label: 'Công ty',
-          path: '/verificator/companies',
-          icon: Building2,
-        },
-      ],
-    },
-    {
-      id: 'verificator-availability',
-      label: 'Quản lý lịch trống',
-      path: '/verificator/availability',
-      icon: CalendarClock,
-    },
-    {
-      id: 'verificator-projects',
-      label: 'Dự án',
-      path: '/verificator/projects',
-      icon: FolderKanban,
-    },
-  ],
-
+  verifier: [],
+  accountant: [],
   moderator: [
     {
       id: 'moderator-projects',
@@ -120,8 +92,9 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
 // Route mặc định khi đăng nhập theo vai trò
 export const roleDefaultRoutes: Record<UserRole, string> = {
   admin: '/admin/revenue',
-  verificator: '/verificator/availability',
   moderator: '/moderator/projects',
+  verifier: '/verifier/student-verifications',
+  accountant: '/accountant/finance',
 };
 
 /**
