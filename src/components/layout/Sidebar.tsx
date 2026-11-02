@@ -5,8 +5,8 @@ import logoImg from '../../assets/logo.jpg';
 import { useAuth } from '../../context/AuthContext';
 import { roleNavigationConfig } from '../../data/navigation';
 import { SidebarItem } from './SidebarItem';
-import { useNotifications } from '../../context/notifications-context';
 import { useAdminManagement } from '../../context/admin-management-context';
+import { useNotifications } from '../../context/notifications-context';
 import type { NavigationItem } from '../../types/navigation';
 
 interface SidebarProps {
@@ -18,24 +18,34 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = false }) => {
   const { currentUser, logout } = useAuth();
   const location = useLocation();
-  const { unreadCount } = useNotifications();
   const access = useAdminManagement();
+  const { unreadCount } = useNotifications();
 
   if (!currentUser) return null;
 
   // Quyền truy cập: nếu backend capabilities null (chưa tải xong hoặc offline), mặc định hiển thị để phát hiện menu
   const canNavigate = (permission: string) =>
-    access.has(permission) || access.capabilities === null;
+    access.has(permission) || (currentUser.role === 'admin' && access.capabilities === null);
 
   const scopes: Record<string, string> = {
+    'admin-revenue': 'finance.view',
+    'admin-statistics': 'finance.view',
+    'admin-withdrawals': 'finance.view',
     'admin-users': 'users.view',
     'admin-staff': 'staff.manage',
+    'admin-student-verifications': 'verification.student.review',
+    'admin-partner-verifications': 'verification.partner.review',
+    'admin-project-moderation': 'project.review',
+    'admin-job-postings': 'recruitment.review',
+    'admin-community-posts': 'community.review',
+    'admin-projects': 'verification.evidence.review',
     'accountant-statistics': 'finance.view',
     'accountant-withdrawals': 'finance.view',
   };
 
   const rawItems = roleNavigationConfig[currentUser.role] || [];
 
+  // Lọc theo quyền và gắn huy hiệu (badge) thời gian thực
   const navItems: NavigationItem[] = rawItems
     .filter(item => {
       const scope = scopes[item.id];
@@ -45,11 +55,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
       return true;
     })
     .map(item => {
-      // Gắn badge động
-      if (item.id === 'verifier-student-verifications' && (access.capabilities?.pendingStudents ?? 0) > 0) {
+      // Gắn badge động cho hồ sơ chờ xác minh
+      if (
+        (item.id === 'verifier-student-verifications' || item.id === 'admin-student-verifications') &&
+        (access.capabilities?.pendingStudents ?? 0) > 0
+      ) {
         return { ...item, badge: String(access.capabilities!.pendingStudents) };
       }
-      if (item.id === 'verifier-partner-verifications' && (access.capabilities?.pendingPartners ?? 0) > 0) {
+      if (
+        (item.id === 'verifier-partner-verifications' || item.id === 'admin-partner-verifications') &&
+        (access.capabilities?.pendingPartners ?? 0) > 0
+      ) {
         return { ...item, badge: String(access.capabilities!.pendingPartners) };
       }
       if (item.path?.includes('/notifications') && unreadCount > 0) {
