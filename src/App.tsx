@@ -16,6 +16,8 @@ import { StaffPage } from './pages/admin/StaffPage';
 import { ServicePackagesPage } from './pages/admin/ServicePackagesPage';
 import { SkillsPage } from './pages/admin/SkillsPage';
 import { AdminProjectsPage } from './pages/admin/ProjectsPage';
+import { ProjectVerificationsPage } from './pages/admin/ProjectVerificationsPage';
+import { ProjectVerificationDetailPage } from './pages/admin/ProjectVerificationDetailPage';
 
 // Moderator Pages
 import { ModeratorProjectsPage } from './pages/moderator/ProjectsPage';
@@ -96,6 +98,8 @@ export const App: React.FC = () => {
             <Route path="career-profiles" element={<CareerProfilesPage />} />
             <Route path="job-postings" element={<JobPostingsPage />} />
             <Route path="projects" element={<AdminProjectsPage />} />
+            <Route path="project-verifications" element={<ProjectVerificationsPage />} />
+            <Route path="project-verifications/:id" element={<ProjectVerificationDetailPage />} />
 
             {/* Tài chính & Kế toán */}
             <Route path="statistics" element={<AccountantStatisticsPage />} />

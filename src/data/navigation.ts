@@ -96,6 +96,14 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
       section: 'QUẢN LÝ & XÁC MINH',
       sectionIcon: Users,
     },
+    {
+      id: 'admin-project-verifications',
+      label: 'Thẩm định dự án',
+      path: '/admin/project-verifications',
+      icon: ShieldCheck,
+      section: 'QUẢN LÝ & XÁC MINH',
+      sectionIcon: Users,
+    },
 
     // Section: KIỂM DUYỆT
     {
