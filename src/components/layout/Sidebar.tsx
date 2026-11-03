@@ -132,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
         </div>
 
         {/* Danh sách mục điều hướng theo vai trò */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-1.5">
           {navItems.map((item, index) => {
             const isFirstOfSection = index === 0 || item.section !== navItems[index - 1].section;
             const SectionIcon = item.sectionIcon;

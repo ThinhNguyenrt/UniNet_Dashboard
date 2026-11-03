@@ -504,7 +504,7 @@ export const ComplaintsPage: React.FC = () => {
       {/* Detail Modal */}
       {activeComplaint && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto no-scrollbar"
           onClick={() => setActiveComplaint(null)}
         >
           <div
