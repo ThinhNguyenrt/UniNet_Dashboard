@@ -35,16 +35,18 @@ test('accountant sidebar has exactly 4 items across 2 sections in order', () => 
   assert.ok(!labels.includes('đối soát'));
 });
 
-test('admin sidebar has exactly the 14 items across 4 sections matching reference design in order', () => {
+test('admin sidebar has exactly the 15 items across 4 sections matching reference design in order', () => {
   const adminNav = roleNavigationConfig.admin;
-  assert.equal(adminNav.length, 14, 'Admin navigation must have exactly 14 items');
+  assert.equal(adminNav.length, 15, 'Admin navigation must have exactly 15 items');
 
   const [
     users, staff, students, partners,
-    projectMod, communityPosts, complaints,
+    projectVerifications, projectMod, communityPosts, complaints,
     statistics, withdrawals, finSettings,
     ads, notifications, activityLogs, skills
   ] = adminNav;
+
+  // Section 1: QUẢN LÝ & XÁC MINH
 
   // Section 1: QUẢN LÝ & XÁC MINH
   assert.equal(users.label, 'Người dùng');
@@ -63,7 +65,12 @@ test('admin sidebar has exactly the 14 items across 4 sections matching referenc
   assert.equal(partners.path, '/admin/partner-verifications');
   assert.equal(partners.section, 'QUẢN LÝ & XÁC MINH');
 
+  assert.equal(projectVerifications.label, 'Thẩm định dự án');
+  assert.equal(projectVerifications.path, '/admin/project-verifications');
+  assert.equal(projectVerifications.section, 'QUẢN LÝ & XÁC MINH');
+
   // Section 2: KIỂM DUYỆT
+
   assert.equal(projectMod.label, 'Kiểm duyệt dự án');
   assert.equal(projectMod.path, '/admin/project-moderation');
   assert.equal(projectMod.section, 'KIỂM DUYỆT');
@@ -95,7 +102,7 @@ test('admin sidebar has exactly the 14 items across 4 sections matching referenc
   assert.equal(ads.section, 'HỆ THỐNG');
 
   // "Thông báo" trong admin sidebar là trang tạo/phát thông báo (/admin/notification-broadcasts)
-  assert.equal(notifications.label, 'Thông báo');
+  assert.equal(notifications.label, 'Thông báo hệ thống');
   assert.equal(notifications.path, '/admin/notification-broadcasts');
   assert.equal(notifications.section, 'HỆ THỐNG');
 
