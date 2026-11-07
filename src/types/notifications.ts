@@ -26,7 +26,7 @@ export interface NotificationPage {
 export interface BroadcastInput {
   title: string;
   message: string;
-  audience: 'All' | 'Role' | 'Selected';
+  audience: 'All' | 'Role' | 'Staff' | 'Selected';
   role?: 'Student' | 'Partner' | 'Admin' | 'Moderator' | 'Assessor' | 'Verifier' | 'Accountant';
   recipientAccountIds?: string[];
   targetUrl?: string;

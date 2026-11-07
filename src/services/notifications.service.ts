@@ -3,7 +3,7 @@ import type { BroadcastInput, NotificationBroadcast, NotificationPage } from '..
 
 const broadcasts = '/admin/notification-broadcasts';
 export const notificationsService = {
-  list: async (params: { page?: number; pageSize?: number; unreadOnly?: boolean; category?: string } = {}, signal?: AbortSignal) =>
+  list: async (params: { page?: number; pageSize?: number; unreadOnly?: boolean; readOnly?: boolean; category?: string } = {}, signal?: AbortSignal) =>
     (await apiClient.get<NotificationPage>('/notifications', { params, signal })).data,
   unreadCount: async (signal?: AbortSignal) => (await apiClient.get<{ count: number }>('/notifications/unread-count', { signal })).data.count,
   read: async (id: string) => { await apiClient.patch(`/notifications/${encodeURIComponent(id)}/read`); },

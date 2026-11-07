@@ -4,12 +4,14 @@ import type { NotificationItem } from '../types/notifications';
 export interface NotificationsState {
   items: NotificationItem[];
   unreadCount: number;
+  totalCount: number;
   loading: boolean;
   error: string;
   canManage: boolean;
   revision: number;
+  readStates: Record<string, string | null>;
   refresh: () => Promise<void>;
-  read: (id: string) => Promise<void>;
+  read: (item: NotificationItem) => Promise<void>;
   readAll: () => Promise<void>;
 }
 

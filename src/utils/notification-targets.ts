@@ -1,5 +1,26 @@
 import type { UserRole } from '../types/auth';
 
+export function notificationRelativeTime(value: string, now = Date.now()) {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return '';
+  const minutes = Math.max(0, Math.floor((now - time) / 60000));
+  if (minutes < 1) return 'Vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)} giờ trước`;
+  if (minutes < 43200) return `${Math.floor(minutes / 1440)} ngày trước`;
+  return new Date(time).toLocaleDateString('vi-VN');
+}
+
+export function groupNotifications<T extends { createdAt: string }>(items: T[]) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const groups = ['Hôm nay', 'Trước đó'].map(label => ({ label, items: [] as T[] }));
+  for (const item of items) {
+    const time = Date.parse(item.createdAt);
+    groups[time >= +today ? 0 : 1].items.push(item);
+  }
+  return groups.filter(group => group.items.length);
+}
+
 const routes: Record<UserRole, readonly string[]> = {
   admin: [
     '/admin/users',
