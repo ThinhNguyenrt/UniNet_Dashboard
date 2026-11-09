@@ -18,6 +18,8 @@ import { SkillsPage } from './pages/admin/SkillsPage';
 import { AdminProjectsPage } from './pages/admin/ProjectsPage';
 import { ProjectVerificationsPage } from './pages/admin/ProjectVerificationsPage';
 import { ProjectVerificationDetailPage } from './pages/admin/ProjectVerificationDetailPage';
+import { AssessorOnboardingsPage } from './pages/admin/AssessorOnboardingsPage';
+import { AssessorOnboardingDetailPage } from './pages/admin/AssessorOnboardingDetailPage';
 
 // Moderator Pages
 import { ModeratorProjectsPage } from './pages/moderator/ProjectsPage';
@@ -115,6 +117,8 @@ export const App: React.FC = () => {
             <Route path="activity-logs" element={<ActivityLogsPage />} />
             <Route path="skills" element={<SkillsPage />} />
             <Route path="service-packages" element={<ServicePackagesPage />} />
+            <Route path="assessor-onboardings" element={<AssessorOnboardingsPage />} />
+            <Route path="assessor-onboardings/:id" element={<AssessorOnboardingDetailPage />} />
           </Route>
 
           {/* Phân vùng Moderator */}

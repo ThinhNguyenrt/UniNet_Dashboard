@@ -20,6 +20,7 @@ import {
   Sliders,
   Coins,
   CreditCard,
+  Package,
 } from 'lucide-react';
 import type { NavigationItem } from '../types/navigation';
 import type { UserRole } from '../types/auth';
@@ -187,6 +188,14 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
       label: 'Kỹ năng',
       path: '/admin/skills',
       icon: Award,
+      section: 'HỆ THỐNG',
+      sectionIcon: Settings,
+    },
+    {
+      id: 'admin-service-config',
+      label: 'Cấu hình dịch vụ',
+      path: '/admin/service-packages',
+      icon: Package,
       section: 'HỆ THỐNG',
       sectionIcon: Settings,
     },
