@@ -162,15 +162,11 @@ export const ReplaceVerificatorDialog: React.FC<ReplaceVerificatorDialogProps> =
 
           {/* Current Assignment Info */}
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 text-xs text-slate-600">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="font-medium text-slate-500">Người thẩm định hiện tại:</span>
               <span className="font-semibold text-slate-800">
-                {assignment.assignedToFullName || assignment.assignedToUserId}
+                {assignment.assignedToFullName || 'Chưa cập nhật tên người thẩm định'}
               </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-medium text-slate-500">Mã phân công hiện tại:</span>
-              <span className="font-mono text-slate-700">{assignment.id}</span>
             </div>
           </div>
 

@@ -8,6 +8,8 @@ import type {
   ProjectVerificationFilter,
 } from '../types/admin-project-verifications';
 
+const packageCache = new Map<string, { id: string; name: string; code: string; price: number }>();
+
 export const adminProjectVerificationsService = {
   /**
    * Danh sách hồ sơ thẩm định chung với bộ lọc
@@ -106,6 +108,31 @@ export const adminProjectVerificationsService = {
       { signal }
     );
     return response.data;
+  },
+
+  /**
+   * Lấy thông tin gói dịch vụ theo ID (có cache tránh gọi lặp)
+   */
+  async getPackage(
+    packageId: string,
+    signal?: AbortSignal
+  ): Promise<{ id: string; name: string; code: string; price: number } | null> {
+    if (!packageId) return null;
+    if (packageCache.has(packageId)) {
+      return packageCache.get(packageId)!;
+    }
+    try {
+      const response = await apiClient.get<{ id: string; name: string; code: string; price: number }>(
+        `/packages/${packageId}`,
+        { signal }
+      );
+      if (response.data) {
+        packageCache.set(packageId, response.data);
+      }
+      return response.data;
+    } catch {
+      return null;
+    }
   },
 };
 
