@@ -28,6 +28,7 @@ interface AssignmentHistoryPanelProps {
   canReassign: boolean;
   onOpenAssignDialog: () => void;
   onOpenReplaceDialog: (assignment: VerificationAssignmentResponse) => void;
+  verificatorNameMap?: Record<string, string>;
 }
 
 export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
@@ -36,6 +37,7 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
   canReassign,
   onOpenAssignDialog,
   onOpenReplaceDialog,
+  verificatorNameMap,
 }) => {
   const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null);
   const [assignmentDetails, setAssignmentDetails] = useState<Record<string, AssignmentDetailResponse>>({});
@@ -147,9 +149,6 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
                       >
                         {verificationAssignmentStatusLabels[assignment.status]}
                       </span>
-                      <span className="text-xs text-slate-400 font-mono">
-                        ID: {assignment.id}
-                      </span>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-slate-700">
@@ -157,7 +156,10 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
                         <Users className="w-4 h-4 text-slate-400" />
                         <span className="text-slate-500 text-xs">Thẩm định viên:</span>
                         <span className="font-medium text-slate-800">
-                          {assignment.assignedToFullName || assignment.assignedToUserId}
+                          {assignment.assignedToFullName ||
+                            verificatorNameMap?.[assignment.assignedToUserId] ||
+                            assignmentDetails[assignment.id]?.assignedToUser?.fullName ||
+                            'Chưa cập nhật tên người thẩm định'}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -198,7 +200,17 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
                   <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                     {isReplaceable && (
                       <button
-                        onClick={() => onOpenReplaceDialog(assignment)}
+                        onClick={() => {
+                          const resolvedFullName =
+                            assignment.assignedToFullName ||
+                            verificatorNameMap?.[assignment.assignedToUserId] ||
+                            assignmentDetails[assignment.id]?.assignedToUser?.fullName ||
+                            null;
+                          onOpenReplaceDialog({
+                            ...assignment,
+                            assignedToFullName: resolvedFullName,
+                          });
+                        }}
                         className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1.5"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
@@ -236,13 +248,13 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
                           <p className="font-semibold text-slate-700">Mốc thời gian phân công:</p>
                           <div className="space-y-1 text-slate-600">
                             <p>
-                              • Hạn phân công (AssignmentDueAt):{' '}
+                              • Hạn phân công:{' '}
                               <span className="font-medium text-slate-800">
                                 {formatDate(detail.assignment.assignmentDueAt)}
                               </span>
                             </p>
                             <p>
-                              • Hạn nộp báo cáo (ReportDueAt):{' '}
+                              • Hạn nộp báo cáo:{' '}
                               <span className="font-medium text-slate-800">
                                 {formatDate(detail.assignment.reportDueAt)}
                               </span>
@@ -262,15 +274,18 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
                           <p className="font-semibold text-slate-700">Người thực hiện:</p>
                           <div className="space-y-1 text-slate-600">
                             <p>
-                              • Admin chỉ định ID:{' '}
-                              <span className="font-mono text-slate-800">
-                                {detail.assignment.adminId}
+                              • Thẩm định viên phụ trách:{' '}
+                              <span className="font-medium text-slate-800">
+                                {detail.assignedToUser?.fullName ||
+                                  verificatorNameMap?.[detail.assignment.assignedToUserId] ||
+                                  assignment.assignedToFullName ||
+                                  'Chưa cập nhật tên người thẩm định'}
                               </span>
                             </p>
                             <p>
-                              • Thẩm định viên ID:{' '}
-                              <span className="font-mono text-slate-800">
-                                {detail.assignment.assignedToUserId}
+                              • Đơn vị chỉ định:{' '}
+                              <span className="font-medium text-slate-800">
+                                Quản trị viên hệ thống
                               </span>
                             </p>
                             {detail.assignment.completedAt && (
@@ -283,7 +298,7 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
                       </div>
                     ) : (
                       <div className="text-slate-500">
-                        Không thể tải thêm chi tiết kỹ thuật cho phân công này.
+                        Không thể tải thêm chi tiết cho phân công này.
                       </div>
                     )}
                   </div>

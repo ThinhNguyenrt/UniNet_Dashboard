@@ -387,6 +387,7 @@ export interface AssignmentDetailResponse {
   evidenceModeration?: EvidenceModerationResponse | null;
   report?: VerificationReportResponse | null;
   assessmentRubric?: AssessmentRubric | null;
+  assignedToUser?: AssignmentAssigneeResponse | null;
 }
 
 export interface AssignmentsResponse {
@@ -438,13 +439,83 @@ export interface VerificationPaymentResponse {
 
 // 7. Project & Verification Responses
 
+export const ProjectOrigin = {
+  Internal: 0,
+  External: 1,
+} as const;
+export type ProjectOrigin = (typeof ProjectOrigin)[keyof typeof ProjectOrigin];
+
+export interface ProjectSkillInfo {
+  skillId: string;
+  skillName: string;
+  category?: string | null;
+  iconUrl?: string | null;
+  minLevel?: number | null;
+}
+
+export interface ProjectMemberInfo {
+  userId: string;
+  fullName: string;
+  nickname?: string | null;
+  avatarUrl?: string | null;
+  role: string;
+  status: number;
+  joinedAt?: string | null;
+}
+
+export interface ProjectLeaderInfo {
+  userId?: string | null;
+  fullName: string;
+  nickname?: string | null;
+  avatarUrl?: string | null;
+  role?: string | null;
+  status?: number | null;
+  joinedAt?: string | null;
+}
+
+export interface DeclaredProjectMember {
+  name: string;
+  role?: string | null;
+}
+
+export interface ExternalProjectDraftData {
+  title?: string | null;
+  description?: string | null;
+  projectField?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  repositoryUrl?: string | null;
+  demoUrl?: string | null;
+  submitterRole?: string | null;
+  submitterContribution?: string | null;
+  submitterIsLeader?: boolean | null;
+  leaderName?: string | null;
+  skillIds?: string[];
+  evidenceFileIds?: string[];
+  features?: string[];
+  members?: DeclaredProjectMember[];
+}
+
+export interface AssignmentAssigneeResponse {
+  userId: string;
+  fullName: string;
+  avatarUrl?: string | null;
+  nickname?: string | null;
+}
+
 export interface VerificationProjectResponse {
   id: string;
   title: string;
   projectField: string;
   description: string;
   status: BackendProjectStatus;
-  leaderId: string;
+  leaderId?: string | null;
+  origin?: ProjectOrigin;
+  ownerUserId?: string | null;
+  leader?: ProjectLeaderInfo | null;
+  externalDetails?: ExternalProjectDraftData | null;
+  skills?: ProjectSkillInfo[];
+  members?: ProjectMemberInfo[];
 }
 
 export interface VerificationFinalResultResponse {

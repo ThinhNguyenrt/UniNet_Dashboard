@@ -89,7 +89,7 @@ export const VerificationReportView: React.FC<VerificationReportViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Mã báo cáo: <span className="font-mono">{report.id}</span>
+                Kết luận thẩm định chuyên môn độc lập
               </p>
             </div>
           </div>

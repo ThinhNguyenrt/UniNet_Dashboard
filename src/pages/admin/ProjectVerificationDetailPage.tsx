@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   RotateCcw,
@@ -9,10 +9,15 @@ import {
   CreditCard,
   FileCheck2,
   Users,
-  Shield,
   Loader2,
+  Sparkles,
+  ExternalLink,
+  Globe,
+  GitBranch,
+  Info,
 } from 'lucide-react';
 import { adminProjectVerificationsService } from '../../services/admin-project-verifications.service';
+import { adminAssignmentsService } from '../../services/admin-assignments.service';
 import type {
   ProjectVerificationDetailResponse,
   VerificationAssignmentResponse,
@@ -34,18 +39,27 @@ import { AssignVerificatorDialog } from '../../components/project-verifications/
 import { ReplaceVerificatorDialog } from '../../components/project-verifications/ReplaceVerificatorDialog';
 import { AssignmentHistoryPanel } from '../../components/project-verifications/AssignmentHistoryPanel';
 import { VerificationReportView } from '../../components/project-verifications/VerificationReportView';
-import { EvidenceModerationPanel } from '../../components/project-verifications/EvidenceModerationPanel';
 
-type DetailTab = 'overview' | 'assignments' | 'evidence' | 'report' | 'payments';
+type DetailTab = 'overview' | 'assignments' | 'report' | 'payments';
 
 export const ProjectVerificationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Validate initial tab from URL params (smoothly map legacy 'evidence' or invalid tabs to 'overview')
+  const rawTab = searchParams.get('tab');
+  const validTabs: DetailTab[] = ['overview', 'assignments', 'report', 'payments'];
+  const initialTab: DetailTab = validTabs.includes(rawTab as DetailTab)
+    ? (rawTab as DetailTab)
+    : 'overview';
 
   const [detail, setDetail] = useState<ProjectVerificationDetailResponse | null>(null);
+  const [packageName, setPackageName] = useState<string>('');
+  const [verificatorNameMap, setVerificatorNameMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [activeTab, setActiveTab] = useState<DetailTab>(initialTab);
   const [reloadKey, setReloadKey] = useState<number>(0);
 
   // Dialog states
@@ -66,9 +80,26 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         }).format(date);
   };
 
+  const handleTabChange = (tab: DetailTab) => {
+    setActiveTab(tab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === 'overview') {
+          next.delete('tab');
+        } else {
+          next.set('tab', tab);
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
   useEffect(() => {
     const verificationId = id;
     if (!verificationId) return;
+
     let ignore = false;
     const controller = new AbortController();
 
@@ -79,6 +110,57 @@ export const ProjectVerificationDetailPage: React.FC = () => {
           setDetail(result);
           setErrorMessage(null);
           setIsLoading(false);
+
+          // Populate verificatorNameMap from existing assignments with names
+          if (result.assignments && result.assignments.length > 0) {
+            setVerificatorNameMap((prev) => {
+              const next = { ...prev };
+              result.assignments.forEach((a) => {
+                if (a.assignedToUserId && a.assignedToFullName) {
+                  next[a.assignedToUserId] = a.assignedToFullName;
+                }
+              });
+              return next;
+            });
+          }
+
+          // Fetch package info by packageId
+          if (result.packageId) {
+            adminProjectVerificationsService
+              .getPackage(result.packageId, controller.signal)
+              .then((pkg) => {
+                if (!ignore && pkg) {
+                  setPackageName(pkg.name);
+                } else if (!ignore) {
+                  setPackageName('Chưa có thông tin');
+                }
+              })
+              .catch(() => {
+                if (!ignore) setPackageName('Chưa có thông tin');
+              });
+          } else {
+            setPackageName('Chưa có thông tin');
+          }
+
+          // Fetch suitable candidates to enrich verificator name map
+          adminAssignmentsService
+            .getCandidates(targetId, undefined, controller.signal)
+            .then((candidates) => {
+              if (!ignore && Array.isArray(candidates)) {
+                setVerificatorNameMap((prev) => {
+                  const next = { ...prev };
+                  candidates.forEach((c) => {
+                    if (c.userId && c.fullName) {
+                      next[c.userId] = c.fullName;
+                    }
+                  });
+                  return next;
+                });
+              }
+            })
+            .catch(() => {
+              // Non-blocking: candidates endpoint may return empty or error on historical cases
+            });
         }
       } catch (err: unknown) {
         if (!ignore && !controller.signal.aborted) {
@@ -111,7 +193,9 @@ export const ProjectVerificationDetailPage: React.FC = () => {
     setIsReplaceDialogOpen(true);
   };
 
-  if (isLoading) {
+  const isDifferentProject = Boolean(detail && id && detail.verification.id !== id);
+
+  if (isLoading || isDifferentProject) {
     return (
       <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-500 animate-fade-in">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -149,8 +233,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
     );
   }
 
-  const { verification, project, evidenceModeration, assignments, payments, finalResult } =
-    detail;
+  const { verification, project, assignments, payments, finalResult } = detail;
 
   const verificationStatusStyle =
     projectVerificationStatusStyles[verification.status] ||
@@ -172,6 +255,119 @@ export const ProjectVerificationDetailPage: React.FC = () => {
   );
   const canAssign = isCasePending && !hasActiveAssignment;
   const canReassign = isCasePending;
+
+  // Xây dựng danh sách thành viên hoàn chỉnh bao gồm cả trưởng nhóm
+  const combinedMembers = (() => {
+    const list: Array<{
+      id: string;
+      fullName: string;
+      nickname?: string | null;
+      avatarUrl?: string | null;
+      role: string;
+      isLeader: boolean;
+      joinedAt?: string | null;
+    }> = [];
+
+    const existingNames = new Set<string>();
+    const existingUserIds = new Set<string>();
+
+    // 1. Thêm trưởng nhóm trước nếu có
+    const leader = project.leader;
+    const externalLeaderName = project.externalDetails?.leaderName;
+
+    if (leader && leader.fullName) {
+      list.push({
+        id: leader.userId || 'leader-user',
+        fullName: leader.fullName,
+        nickname: leader.nickname,
+        avatarUrl: leader.avatarUrl,
+        role:
+          leader.role && leader.role !== 'Creator' && leader.role !== 'Leader'
+            ? leader.role
+            : 'Trưởng nhóm',
+        isLeader: true,
+        joinedAt: leader.joinedAt,
+      });
+      if (leader.userId) existingUserIds.add(leader.userId);
+      existingNames.add(leader.fullName.toLowerCase().trim());
+    } else if (externalLeaderName) {
+      list.push({
+        id: 'external-leader',
+        fullName: externalLeaderName,
+        nickname: null,
+        avatarUrl: null,
+        role: 'Trưởng nhóm',
+        isLeader: true,
+        joinedAt: null,
+      });
+      existingNames.add(externalLeaderName.toLowerCase().trim());
+    }
+
+    // 2. Thêm các thành viên có tài khoản hệ thống (loại trừ nếu trùng trưởng nhóm)
+    if (project.members && project.members.length > 0) {
+      project.members.forEach((m) => {
+        const isDuplicate =
+          (m.userId && existingUserIds.has(m.userId)) ||
+          existingNames.has(m.fullName.toLowerCase().trim());
+
+        if (isDuplicate) {
+          const idx = list.findIndex(
+            (item) =>
+              (m.userId && item.id === m.userId) ||
+              item.fullName.toLowerCase().trim() === m.fullName.toLowerCase().trim()
+          );
+          if (idx !== -1) {
+            list[idx].isLeader = true;
+            if (m.avatarUrl && !list[idx].avatarUrl) list[idx].avatarUrl = m.avatarUrl;
+            if (m.nickname && !list[idx].nickname) list[idx].nickname = m.nickname;
+            if (m.joinedAt && !list[idx].joinedAt) list[idx].joinedAt = m.joinedAt;
+          }
+        } else {
+          const isLeaderRole = Boolean(
+            m.role?.toLowerCase().includes('leader') || m.role?.toLowerCase().includes('trưởng')
+          );
+          list.push({
+            id: m.userId,
+            fullName: m.fullName,
+            nickname: m.nickname,
+            avatarUrl: m.avatarUrl,
+            role: m.role || 'Thành viên',
+            isLeader: isLeaderRole,
+            joinedAt: m.joinedAt,
+          });
+          if (m.userId) existingUserIds.add(m.userId);
+          existingNames.add(m.fullName.toLowerCase().trim());
+        }
+      });
+    }
+
+    // 3. Thêm các thành viên tự khai báo từ hồ sơ ngoài (nếu chưa có trong danh sách)
+    if (project.externalDetails?.members && project.externalDetails.members.length > 0) {
+      project.externalDetails.members.forEach((dm, idx) => {
+        if (!existingNames.has(dm.name.toLowerCase().trim())) {
+          const isLeaderRole = Boolean(
+            dm.role?.toLowerCase().includes('leader') || dm.role?.toLowerCase().includes('trưởng')
+          );
+          list.push({
+            id: `declared-${idx}`,
+            fullName: dm.name,
+            nickname: null,
+            avatarUrl: null,
+            role: dm.role || 'Thành viên',
+            isLeader: isLeaderRole,
+            joinedAt: null,
+          });
+          existingNames.add(dm.name.toLowerCase().trim());
+        }
+      });
+    }
+
+    return list;
+  })();
+
+  // Báo cáo thẩm định count
+  const reportCount =
+    finalResult?.reports?.length || (assignments.some((a) => a.report) ? 1 : 0);
 
   return (
     <div className="space-y-6 animate-fade-in p-6 max-w-7xl mx-auto">
@@ -199,8 +395,8 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="font-mono text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                Hồ sơ #{verification.id}
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-slate-700">
+                Hồ sơ thẩm định dự án
               </span>
               <span
                 className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${verificationStatusStyle.bg} ${verificationStatusStyle.text} ${verificationStatusStyle.border}`}
@@ -219,8 +415,10 @@ export const ProjectVerificationDetailPage: React.FC = () => {
             </h1>
             <p className="text-xs text-slate-500">
               Lĩnh vực:{' '}
-              <span className="font-medium text-slate-700">{project.projectField}</span> | Trạng
-              thái dự án:{' '}
+              <span className="font-medium text-slate-700">
+                {project.projectField || 'Chưa phân loại'}
+              </span>{' '}
+              | Trạng thái dự án:{' '}
               <span
                 className={`inline-block px-2 py-0.2 rounded text-[11px] font-medium border ${projectStatusStyle.bg} ${projectStatusStyle.text} ${projectStatusStyle.border}`}
               >
@@ -256,7 +454,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
             <span className="text-slate-400 block mb-0.5">Lịch hẹn dự kiến:</span>
             <span className="font-medium text-slate-800">
               {verification.scheduledStartAt
-                ? `${formatDate(verification.scheduledStartAt)}`
+                ? formatDate(verification.scheduledStartAt)
                 : 'Chưa đặt lịch'}
             </span>
           </div>
@@ -271,8 +469,10 @@ export const ProjectVerificationDetailPage: React.FC = () => {
           </div>
 
           <div>
-            <span className="text-slate-400 block mb-0.5">Gói dịch vụ (Package):</span>
-            <span className="font-mono text-slate-700">{detail.packageId}</span>
+            <span className="text-slate-400 block mb-0.5">Gói dịch vụ đăng ký:</span>
+            <span className="font-medium text-slate-800">
+              {packageName || 'Đang tải thông tin gói...'}
+            </span>
           </div>
         </div>
       </div>
@@ -280,7 +480,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
       {/* Tabs navigation */}
       <div className="flex border-b border-slate-200 gap-1 bg-white px-4 pt-2 rounded-t-xl border-t border-x overflow-x-auto">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => handleTabChange('overview')}
           className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
             activeTab === 'overview'
               ? 'border-blue-600 text-blue-600'
@@ -292,7 +492,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('assignments')}
+          onClick={() => handleTabChange('assignments')}
           className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
             activeTab === 'assignments'
               ? 'border-blue-600 text-blue-600'
@@ -304,19 +504,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('evidence')}
-          className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
-            activeTab === 'evidence'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Shield className="w-4 h-4 text-emerald-500" />
-          Bằng chứng cấp 1
-        </button>
-
-        <button
-          onClick={() => setActiveTab('report')}
+          onClick={() => handleTabChange('report')}
           className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
             activeTab === 'report'
               ? 'border-blue-600 text-blue-600'
@@ -324,11 +512,11 @@ export const ProjectVerificationDetailPage: React.FC = () => {
           }`}
         >
           <FileCheck2 className="w-4 h-4 text-blue-500" />
-          Báo cáo thẩm định ({finalResult?.reports?.length || (assignments.some(a => a.report) ? 1 : 0)})
+          Báo cáo thẩm định ({reportCount})
         </button>
 
         <button
-          onClick={() => setActiveTab('payments')}
+          onClick={() => handleTabChange('payments')}
           className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
             activeTab === 'payments'
               ? 'border-blue-600 text-blue-600'
@@ -351,32 +539,264 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                 Thông tin dự án
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
                 <div className="space-y-1">
                   <span className="text-slate-400 font-medium">Tên dự án:</span>
                   <p className="font-semibold text-slate-800 text-sm">{project.title}</p>
                 </div>
+
                 <div className="space-y-1">
-                  <span className="text-slate-400 font-medium">Lĩnh vực:</span>
-                  <p className="font-medium text-slate-700">{project.projectField}</p>
+                  <span className="text-slate-400 font-medium">Lĩnh vực chuyên môn:</span>
+                  <p className="font-medium text-slate-700">
+                    {project.projectField || 'Chưa phân loại'}
+                  </p>
                 </div>
+
                 <div className="space-y-1">
-                  <span className="text-slate-400 font-medium">Trưởng dự án (Leader ID):</span>
-                  <p className="font-mono text-slate-700">{project.leaderId}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-slate-400 font-medium">Mã dự án (Project ID):</span>
-                  <p className="font-mono text-slate-700">{project.id}</p>
+                  <span className="text-slate-400 font-medium">Loại hình hồ sơ:</span>
+                  <p>
+                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                      {project.origin === 1
+                        ? 'Dự án nhập từ tài liệu'
+                        : 'Dự án trên nền tảng UniNet'}
+                    </span>
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-1 pt-2 border-t border-slate-100">
                 <span className="text-slate-400 font-medium text-xs">Mô tả dự án:</span>
-                <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">
+                <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-lg border border-slate-100 whitespace-pre-wrap">
                   {project.description || 'Không có mô tả bổ sung.'}
                 </p>
               </div>
             </div>
+
+            {/* Project Skills Section */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  Kỹ năng & Công nghệ dự án
+                </h3>
+                {project.skills && project.skills.length > 0 && (
+                  <span className="text-xs text-slate-500 font-medium">
+                    {project.skills.length} kỹ năng
+                  </span>
+                )}
+              </div>
+
+              {project.skills && project.skills.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {project.skills.map((skill) => (
+                    <span
+                      key={skill.skillId}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                    >
+                      {skill.iconUrl && (
+                        <img
+                          src={skill.iconUrl}
+                          alt=""
+                          className="w-3.5 h-3.5 object-contain rounded"
+                        />
+                      )}
+                      <span>{skill.skillName}</span>
+                      {skill.category && (
+                        <span className="text-[10px] text-blue-500/80 bg-blue-100/60 px-1.5 py-0.2 rounded font-normal">
+                          {skill.category}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic py-2">
+                  Dự án chưa gắn danh mục kỹ năng hoặc công nghệ.
+                </p>
+              )}
+            </div>
+
+            {/* Team Members Section */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  Danh sách thành viên tham gia ({combinedMembers.length})
+                </h3>
+              </div>
+
+              {combinedMembers.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-3 text-center">
+                  Chưa có thông tin danh sách thành viên cho dự án này.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {combinedMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/80 flex items-start gap-3"
+                    >
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt=""
+                          className="w-9 h-9 rounded-full object-cover border border-slate-200 mt-0.5"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                          {member.fullName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-slate-900 text-xs truncate">
+                            {member.fullName}
+                          </span>
+                          {member.nickname && (
+                            <span className="text-[11px] text-slate-400">
+                              @{member.nickname}
+                            </span>
+                          )}
+                          {member.isLeader && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              Trưởng nhóm
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                          <span>
+                            Vai trò: <strong className="text-slate-700">{member.role}</strong>
+                          </span>
+                        </div>
+
+                        {member.joinedAt && (
+                          <p className="text-[11px] text-slate-400">
+                            Tham gia: {formatDate(member.joinedAt)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Submitter contribution info if external project */}
+              {project.externalDetails &&
+                (project.externalDetails.submitterRole ||
+                  project.externalDetails.submitterContribution) && (
+                  <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-xl text-xs space-y-1.5">
+                    <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-blue-600" />
+                      Thông tin tự khai báo của người nộp hồ sơ:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+                      {project.externalDetails.submitterRole && (
+                        <p>
+                          • Vai trò đảm nhiệm:{' '}
+                          <span className="font-semibold text-slate-900">
+                            {project.externalDetails.submitterRole}
+                          </span>
+                        </p>
+                      )}
+                      {project.externalDetails.submitterIsLeader !== undefined &&
+                        project.externalDetails.submitterIsLeader !== null && (
+                          <p>
+                            • Vị trí nhóm:{' '}
+                            <span className="font-semibold text-slate-900">
+                              {project.externalDetails.submitterIsLeader
+                                ? 'Trưởng nhóm'
+                                : 'Thành viên'}
+                            </span>
+                          </p>
+                        )}
+                      {project.externalDetails.submitterContribution && (
+                        <p className="sm:col-span-2">
+                          • Đóng góp trong đề tài:{' '}
+                          <span className="font-medium text-slate-800">
+                            {project.externalDetails.submitterContribution}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* External Links & Draft Details (for imported projects) */}
+            {project.externalDetails &&
+              (project.externalDetails.repositoryUrl ||
+                project.externalDetails.demoUrl ||
+                project.externalDetails.startDate ||
+                project.externalDetails.endDate ||
+                (project.externalDetails.features &&
+                  project.externalDetails.features.length > 0)) && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-emerald-600" />
+                    Liên kết & Thông tin triển khai bổ sung
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    {project.externalDetails.repositoryUrl && (
+                      <div className="space-y-1">
+                        <span className="text-slate-400 font-medium">Mã nguồn (Repository):</span>
+                        <a
+                          href={project.externalDetails.repositoryUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 truncate"
+                        >
+                          <GitBranch className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{project.externalDetails.repositoryUrl}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </div>
+                    )}
+
+                    {project.externalDetails.demoUrl && (
+                      <div className="space-y-1">
+                        <span className="text-slate-400 font-medium">Bản trình diễn (Demo):</span>
+                        <a
+                          href={project.externalDetails.demoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 truncate"
+                        >
+                          <Globe className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{project.externalDetails.demoUrl}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </div>
+                    )}
+
+                    {(project.externalDetails.startDate || project.externalDetails.endDate) && (
+                      <div className="space-y-1">
+                        <span className="text-slate-400 font-medium">Thời gian thực hiện:</span>
+                        <p className="font-medium text-slate-700">
+                          {project.externalDetails.startDate || '—'} đến{' '}
+                          {project.externalDetails.endDate || 'Hiện tại'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {project.externalDetails.features &&
+                    project.externalDetails.features.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                        <span className="text-slate-400 font-medium text-xs">
+                          Tính năng chính đã hoàn thành:
+                        </span>
+                        <ul className="list-disc pl-5 space-y-1 text-xs text-slate-700">
+                          {project.externalDetails.features.map((feature, fIdx) => (
+                            <li key={fIdx}>{feature}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                </div>
+              )}
 
             {/* Booking & Meetings Info */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
@@ -396,34 +816,41 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                     </span>
                   </p>
                 </div>
+
                 <div className="space-y-1">
                   <span className="text-slate-400 font-medium">Xác nhận lịch lúc:</span>
                   <p className="font-medium text-slate-700">
                     {formatDate(verification.bookingConfirmedAt)}
                   </p>
                 </div>
+
                 <div className="space-y-1">
                   <span className="text-slate-400 font-medium">Đủ điều kiện phân công:</span>
                   <p className="font-medium text-slate-700">
                     {formatDate(verification.assignmentEligibleAt)}
                   </p>
                 </div>
+
                 <div className="space-y-1">
                   <span className="text-slate-400 font-medium">Lịch bắt đầu dự kiến:</span>
                   <p className="font-medium text-slate-700">
                     {formatDate(verification.scheduledStartAt)}
                   </p>
                 </div>
+
                 <div className="space-y-1">
                   <span className="text-slate-400 font-medium">Lịch kết thúc dự kiến:</span>
                   <p className="font-medium text-slate-700">
                     {formatDate(verification.scheduledEndAt)}
                   </p>
                 </div>
+
                 <div className="space-y-1">
-                  <span className="text-slate-400 font-medium">Mã giữ chỗ (Reservation):</span>
-                  <p className="font-mono text-slate-700">
-                    {verification.reservationId || '—'}
+                  <span className="text-slate-400 font-medium">Tình trạng giữ chỗ lịch hẹn:</span>
+                  <p className="font-medium text-slate-700">
+                    {verification.reservationId
+                      ? 'Đã cấp giữ chỗ lịch hẹn'
+                      : 'Không có giữ chỗ'}
                   </p>
                 </div>
               </div>
@@ -449,11 +876,8 @@ export const ProjectVerificationDetailPage: React.FC = () => {
             canReassign={canReassign}
             onOpenAssignDialog={() => setIsAssignDialogOpen(true)}
             onOpenReplaceDialog={handleOpenReplace}
+            verificatorNameMap={verificatorNameMap}
           />
-        )}
-
-        {activeTab === 'evidence' && (
-          <EvidenceModerationPanel evidenceModeration={evidenceModeration} />
         )}
 
         {activeTab === 'report' && (
@@ -493,7 +917,9 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
                       <div className="space-y-0.5">
-                        <span className="font-mono text-slate-600">Mã GD: {p.transactionId}</span>
+                        <span className="font-semibold text-slate-800">
+                          {packageName ? `Thanh toán gói: ${packageName}` : 'Thanh toán phí thẩm định'}
+                        </span>
                         <p className="text-slate-500 text-[11px]">
                           Thanh toán lúc: {formatDate(p.paidAt)}
                         </p>
@@ -536,7 +962,9 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                               <p className="font-medium text-slate-800">
                                 Số tiền: {ref.amount?.toLocaleString('vi-VN')} đ
                               </p>
-                              <p className="text-slate-500 text-[11px]">Lý do: {ref.reason}</p>
+                              <p className="text-slate-500 text-[11px]">
+                                Lý do: {ref.reason}
+                              </p>
                             </div>
                             <span className="text-[11px] font-medium text-slate-500">
                               {formatDate(ref.completedAt || ref.requestedAt)}
