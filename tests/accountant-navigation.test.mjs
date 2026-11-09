@@ -35,15 +35,15 @@ test('accountant sidebar has exactly 4 items across 2 sections in order', () => 
   assert.ok(!labels.includes('đối soát'));
 });
 
-test('admin sidebar has exactly the 15 items across 4 sections matching reference design in order', () => {
+test('admin sidebar has exactly the 16 items across 4 sections matching reference design in order', () => {
   const adminNav = roleNavigationConfig.admin;
-  assert.equal(adminNav.length, 15, 'Admin navigation must have exactly 15 items');
+  assert.equal(adminNav.length, 16, 'Admin navigation must have exactly 16 items');
 
   const [
     users, staff, students, partners,
     projectVerifications, projectMod, communityPosts, complaints,
     statistics, withdrawals, finSettings,
-    ads, notifications, activityLogs, skills
+    ads, notifications, activityLogs, skills, serviceConfig
   ] = adminNav;
 
   // Section 1: QUẢN LÝ & XÁC MINH
@@ -113,6 +113,10 @@ test('admin sidebar has exactly the 15 items across 4 sections matching referenc
   assert.equal(skills.label, 'Kỹ năng');
   assert.equal(skills.path, '/admin/skills');
   assert.equal(skills.section, 'HỆ THỐNG');
+
+  assert.equal(serviceConfig.label, 'Cấu hình dịch vụ');
+  assert.equal(serviceConfig.path, '/admin/service-packages');
+  assert.equal(serviceConfig.section, 'HỆ THỐNG');
 });
 
 test('moderator sidebar has exactly 4 items across 2 sections in order', () => {
