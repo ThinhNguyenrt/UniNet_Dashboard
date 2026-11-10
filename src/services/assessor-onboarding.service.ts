@@ -5,6 +5,8 @@ import type {
   AssessorOnboardingReviewResponse,
   AssessorReviewResult,
   CreateAssessorInvitationRequest,
+  AssessorOnboardingsListResponse,
+  AssessorOnboardingFilter,
 } from '../types/assessor-onboarding';
 
 export class ApprovalConflictError extends Error {
@@ -26,6 +28,37 @@ export class ContractUnavailableError extends Error {
 }
 
 export const assessorOnboardingService = {
+  /**
+   * Lấy danh sách hồ sơ onboarding thẩm định viên (phân trang, lọc trạng thái, tìm kiếm từ khóa)
+   * GET /api/admin/assessor-onboardings?keyword=...&status=...&page=...&pageSize=...
+   */
+  async list(
+    filter: AssessorOnboardingFilter = {},
+    signal?: AbortSignal
+  ): Promise<AssessorOnboardingsListResponse> {
+    const params = new URLSearchParams();
+    if (filter.keyword && filter.keyword.trim()) {
+      params.append('keyword', filter.keyword.trim().slice(0, 255));
+    }
+    if (filter.status && filter.status !== 'all') {
+      params.append('status', filter.status);
+    }
+    params.append('page', (filter.page && filter.page > 0 ? filter.page : 1).toString());
+    params.append(
+      'pageSize',
+      (filter.pageSize && filter.pageSize > 0 && filter.pageSize <= 100
+        ? filter.pageSize
+        : 20
+      ).toString()
+    );
+
+    const response = await apiClient.get<AssessorOnboardingsListResponse>(
+      `/admin/assessor-onboardings?${params.toString()}`,
+      { signal }
+    );
+    return response.data;
+  },
+
   /**
    * Tạo lời mời onboarding thẩm định viên mới
    */

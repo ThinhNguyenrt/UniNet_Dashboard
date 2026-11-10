@@ -106,6 +106,14 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
       section: 'QUẢN LÝ & XÁC MINH',
       sectionIcon: Users,
     },
+    {
+      id: 'admin-assessor-onboardings',
+      label: 'Hồ sơ assessor',
+      path: '/admin/assessor-onboardings',
+      icon: UserCheck,
+      section: 'QUẢN LÝ & XÁC MINH',
+      sectionIcon: Users,
+    },
 
     // Section: KIỂM DUYỆT
     {
