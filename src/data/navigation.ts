@@ -21,6 +21,7 @@ import {
   Coins,
   CreditCard,
   Package,
+  Briefcase,
 } from 'lucide-react';
 import type { NavigationItem } from '../types/navigation';
 import type { UserRole } from '../types/auth';
@@ -188,6 +189,14 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
       label: 'Kỹ năng',
       path: '/admin/skills',
       icon: Award,
+      section: 'HỆ THỐNG',
+      sectionIcon: Settings,
+    },
+    {
+      id: 'admin-specializations',
+      label: 'Danh mục ngành nghề',
+      path: '/admin/specializations',
+      icon: Briefcase,
       section: 'HỆ THỐNG',
       sectionIcon: Settings,
     },

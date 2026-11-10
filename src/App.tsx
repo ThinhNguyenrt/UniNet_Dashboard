@@ -15,6 +15,7 @@ import { FinancePage } from './pages/admin/FinancePage';
 import { StaffPage } from './pages/admin/StaffPage';
 import { ServicePackagesPage } from './pages/admin/ServicePackagesPage';
 import { SkillsPage } from './pages/admin/SkillsPage';
+import { SpecializationsPage } from './pages/admin/SpecializationsPage';
 import { AdminProjectsPage } from './pages/admin/ProjectsPage';
 import { ProjectVerificationsPage } from './pages/admin/ProjectVerificationsPage';
 import { ProjectVerificationDetailPage } from './pages/admin/ProjectVerificationDetailPage';
@@ -116,6 +117,7 @@ export const App: React.FC = () => {
             <Route path="notification-broadcasts" element={<NotificationBroadcastsPage />} />
             <Route path="activity-logs" element={<ActivityLogsPage />} />
             <Route path="skills" element={<SkillsPage />} />
+            <Route path="specializations" element={<SpecializationsPage />} />
             <Route path="service-packages" element={<ServicePackagesPage />} />
             <Route path="assessor-onboardings" element={<AssessorOnboardingsPage />} />
             <Route path="assessor-onboardings/:id" element={<AssessorOnboardingDetailPage />} />
