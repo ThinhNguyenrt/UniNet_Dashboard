@@ -999,6 +999,10 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         isOpen={isAssignDialogOpen}
         onClose={() => setIsAssignDialogOpen(false)}
         projectVerificationId={verification.id}
+        projectId={project.id}
+        projectTitle={project.title}
+        scheduledStartAt={verification.scheduledStartAt}
+        scheduledEndAt={verification.scheduledEndAt}
         onSuccess={handleRefresh}
       />
 

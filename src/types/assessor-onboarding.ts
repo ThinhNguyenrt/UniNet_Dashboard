@@ -18,14 +18,14 @@ export const ASSESSOR_ONBOARDING_STATUS_CONFIG: Record<
   { label: string; bg: string; text: string; border: string; desc: string }
 > = {
   [AssessorOnboardingStatus.Invited]: {
-    label: 'Đã tạo lời mời',
+    label: 'Đã gửi lời mời',
     bg: 'bg-slate-50',
     text: 'text-slate-700',
     border: 'border-slate-200',
     desc: 'Hồ sơ vừa được khởi tạo, đang chờ chuyên gia thẩm định mở link điền thông tin.',
   },
   [AssessorOnboardingStatus.ProfileSubmitted]: {
-    label: 'Đã nộp, chờ hợp đồng',
+    label: 'Đã nộp hồ sơ',
     bg: 'bg-amber-50',
     text: 'text-amber-700',
     border: 'border-amber-200',
@@ -39,14 +39,14 @@ export const ASSESSOR_ONBOARDING_STATUS_CONFIG: Record<
     desc: 'Hợp đồng đã sẵn sàng. Đang chờ chuyên gia thẩm định ký điện tử.',
   },
   [AssessorOnboardingStatus.AwaitingApproval]: {
-    label: 'Chờ duyệt',
+    label: 'Chờ phê duyệt',
     bg: 'bg-purple-50',
     text: 'text-purple-700',
     border: 'border-purple-200',
     desc: 'Hợp đồng đã được ký và email đã xác thực. Đang chờ Admin xem xét phê duyệt.',
   },
   [AssessorOnboardingStatus.ApprovalConflict]: {
-    label: 'Xung đột cấp tài khoản',
+    label: 'Xung đột phê duyệt',
     bg: 'bg-rose-50',
     text: 'text-rose-700',
     border: 'border-rose-200',
@@ -88,6 +88,65 @@ export const ASSESSOR_ONBOARDING_STATUS_CONFIG: Record<
     desc: 'Lời mời đã quá thời hạn hiệu lực 7 ngày mà chưa hoàn tất.',
   },
 };
+
+export function getAssessorOnboardingStatusConfig(status?: string | null): {
+  label: string;
+  bg: string;
+  text: string;
+  border: string;
+  desc: string;
+} {
+  if (!status) {
+    return {
+      label: 'Chưa xác định',
+      bg: 'bg-slate-100',
+      text: 'text-slate-600',
+      border: 'border-slate-200',
+      desc: 'Trạng thái chưa được xác định.',
+    };
+  }
+  return (
+    ASSESSOR_ONBOARDING_STATUS_CONFIG[status] || {
+      label: status,
+      bg: 'bg-slate-100',
+      text: 'text-slate-600',
+      border: 'border-slate-200',
+      desc: 'Trạng thái hồ sơ.',
+    }
+  );
+}
+
+export interface AssessorOnboardingListItem {
+  id: string;
+  emailNormalized: string;
+  fullName: string | null;
+  status: string;
+  accountId: string | null;
+  autoApprove: boolean;
+  createdAt: string | null;
+  submittedAt: string | null;
+  signedAt: string | null;
+  autoApproveAt: string | null;
+  reviewedByAccountId: string | null;
+  reviewedAt: string | null;
+  reviewReason: string | null;
+  activatedAt: string | null;
+}
+
+export interface AssessorOnboardingsListResponse {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  onboardings: AssessorOnboardingListItem[];
+}
+
+export interface AssessorOnboardingFilter {
+  keyword?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
 
 export interface AssessorOnboardingReviewResponse {
   id: string;

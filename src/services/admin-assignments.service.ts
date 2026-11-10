@@ -4,6 +4,8 @@ import type {
   AssignmentDetailResponse,
   AssignmentResponse,
   SuitableVerificatorResponse,
+  SuitableAssessorsResponse,
+  AssessorAvailabilityItem,
   CreateAssignmentRequest,
   ReplaceVerificatorRequest,
   VerificationAssignmentStatus,
@@ -64,6 +66,38 @@ export const adminAssignmentsService = {
 
     const response = await apiClient.get<SuitableVerificatorResponse[]>(
       `/assignments/availability?${params.toString()}`,
+      { signal }
+    );
+    return response.data;
+  },
+
+  /**
+   * Lấy danh sách chuyên gia thẩm định phù hợp chuyên ngành của dự án
+   * GET /api/admin/projects/{projectId}/suitable-assessors?page=...&pageSize=...
+   */
+  async getSuitableAssessors(
+    projectId: string,
+    page = 1,
+    pageSize = 20,
+    signal?: AbortSignal
+  ): Promise<SuitableAssessorsResponse> {
+    const response = await apiClient.get<SuitableAssessorsResponse>(
+      `/admin/projects/${projectId}/suitable-assessors?page=${page}&pageSize=${pageSize}`,
+      { signal }
+    );
+    return response.data;
+  },
+
+  /**
+   * Kiểm tra khả năng nhận lịch của các assessor cho hồ sơ thẩm định cụ thể
+   * GET /api/assignments/availability?projectVerificationId={verificationId}
+   */
+  async getAvailability(
+    projectVerificationId: string,
+    signal?: AbortSignal
+  ): Promise<AssessorAvailabilityItem[]> {
+    const response = await apiClient.get<AssessorAvailabilityItem[]>(
+      `/assignments/availability?projectVerificationId=${projectVerificationId}`,
       { signal }
     );
     return response.data;

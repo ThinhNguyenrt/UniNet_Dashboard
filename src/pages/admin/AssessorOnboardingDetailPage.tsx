@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   UserCheck,
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   X,
   Check,
   Info,
+  Loader2,
 } from 'lucide-react';
 import {
   assessorOnboardingService,
@@ -25,14 +27,9 @@ import {
 import { getApiErrorMessage } from '../../services/api';
 import {
   AssessorOnboardingStatus,
-  ASSESSOR_ONBOARDING_STATUS_CONFIG,
+  getAssessorOnboardingStatusConfig,
 } from '../../types/assessor-onboarding';
-import type {
-  AssessorOnboardingReviewResponse,
-  SessionOnboardingItem,
-} from '../../types/assessor-onboarding';
-
-const SESSION_STORAGE_KEY = 'uninet_assessor_onboarding_history';
+import type { AssessorOnboardingReviewResponse } from '../../types/assessor-onboarding';
 
 export const AssessorOnboardingDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -93,28 +90,6 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
     };
   }, [pdfBlobUrl]);
 
-  // Save/Update session history
-  const updateSessionHistory = useCallback((res: AssessorOnboardingReviewResponse) => {
-    try {
-      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      const parsed: SessionOnboardingItem[] = stored ? JSON.parse(stored) : [];
-      const filtered = parsed.filter((item) => item.id.toLowerCase() !== res.id.toLowerCase());
-      const updated: SessionOnboardingItem[] = [
-        {
-          id: res.id,
-          email: res.emailNormalized,
-          fullName: res.fullName,
-          status: res.status,
-          updatedAt: new Date().toISOString(),
-        },
-        ...filtered,
-      ].slice(0, 20);
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      // Ignore
-    }
-  }, []);
-
   // Fetch detail
   const fetchDetail = useCallback(
     async (showLoadingSpinner = true) => {
@@ -125,16 +100,25 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
       try {
         const res = await assessorOnboardingService.getDetail(id);
         setDetail(res);
-        updateSessionHistory(res);
-      } catch (err) {
-        setErrorMessage(
-          getApiErrorMessage(err, 'Không tìm thấy hoặc không thể tải chi tiết hồ sơ onboarding.')
-        );
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+          const status = err.response?.status;
+          const data = err.response?.data as { code?: string; message?: string } | undefined;
+          if (status === 404 || data?.code === 'ONBOARDING_NOT_FOUND') {
+            setErrorMessage('Hồ sơ onboarding không còn tồn tại trên hệ thống.');
+          } else if (status === 403) {
+            setErrorMessage('Bạn không có quyền xem chi tiết hồ sơ này.');
+          } else {
+            setErrorMessage(getApiErrorMessage(err, 'Không thể tải chi tiết hồ sơ onboarding.'));
+          }
+        } else {
+          setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+        }
       } finally {
         if (showLoadingSpinner) setIsLoading(false);
       }
     },
-    [id, updateSessionHistory]
+    [id]
   );
 
   useEffect(() => {
@@ -142,31 +126,6 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
     fetchDetail(true);
   }, [fetchDetail]);
 
-  // Auto-polling every 12 seconds for active pending states
-  useEffect(() => {
-    if (!detail) return;
-    const pendingStatuses: string[] = [
-      AssessorOnboardingStatus.Invited,
-      AssessorOnboardingStatus.ProfileSubmitted,
-      AssessorOnboardingStatus.AwaitingSignature,
-      AssessorOnboardingStatus.AwaitingApproval,
-      AssessorOnboardingStatus.AwaitingPassword,
-    ];
-
-    if (!pendingStatuses.includes(detail.status)) {
-      return;
-    }
-
-    const intervalId = setInterval(() => {
-      if (!document.hidden) {
-        fetchDetail(false);
-      }
-    }, 12000);
-
-    return () => clearInterval(intervalId);
-  }, [detail, fetchDetail]);
-
-  // Show Toast
   const showToast = (msg: string) => {
     setActionSuccessMessage(msg);
     setTimeout(() => setActionSuccessMessage(null), 4000);
@@ -190,7 +149,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
       setPdfBlobUrl(url);
     } catch (err) {
       if (err instanceof ContractUnavailableError) {
-        setPdfError('Bản hợp đồng chưa được tạo hoặc chưa khả dụng cho hồ sơ này.');
+        setPdfError('Chưa có hợp đồng nào được tạo cho hồ sơ này.');
       } else {
         setPdfError(getApiErrorMessage(err, 'Không thể tải bản thảo hợp đồng PDF.'));
       }
@@ -221,7 +180,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
     } catch (err) {
       if (err instanceof ApprovalConflictError) {
         alert(
-          `Xung đột cấp tài khoản: Email này đã được sử dụng hoặc có xung đột hồ sơ (${err.message}). Trạng thái đã chuyển sang Xung đột (ApprovalConflict).`
+          `Xung đột phê duyệt: Email này đã được sử dụng hoặc có xung đột hồ sơ (${err.message}). Trạng thái đã chuyển sang Xung đột phê duyệt.`
         );
         await fetchDetail(false);
       } else {
@@ -312,9 +271,9 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
     }
   };
 
-  // Format date helper
+  // Format date helper in Asia/Ho_Chi_Minh (UTC+7)
   const formatDateTime = (dateStr: string | null) => {
-    if (!dateStr) return 'Chưa có thông tin';
+    if (!dateStr) return '—';
     try {
       return new Date(dateStr).toLocaleString('vi-VN', {
         hour: '2-digit',
@@ -322,6 +281,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
+        timeZone: 'Asia/Ho_Chi_Minh',
       });
     } catch {
       return dateStr;
@@ -331,7 +291,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="py-24 text-center text-slate-500">
-        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
         <p className="text-xs font-medium">Đang tải thông tin chi tiết hồ sơ onboarding...</p>
       </div>
     );
@@ -339,20 +299,20 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
 
   if (errorMessage || !detail) {
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-4 text-center py-20">
+      <div className="p-6 max-w-2xl mx-auto space-y-4 text-center py-20 animate-fade-in">
         <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
           <AlertCircle className="w-6 h-6" />
         </div>
-        <h2 className="text-base font-bold text-slate-900">Không tìm thấy hồ sơ</h2>
+        <h2 className="text-base font-bold text-slate-900">Không thể hiển thị hồ sơ</h2>
         <p className="text-xs text-slate-600 max-w-md mx-auto">
-          {errorMessage || 'Hồ sơ onboarding không tồn tại hoặc ID không hợp lệ.'}
+          {errorMessage || 'Hồ sơ onboarding không tồn tại hoặc bạn không có quyền truy cập.'}
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             onClick={() => navigate('/admin/assessor-onboardings')}
             className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
           >
-            Về trang tra cứu
+            Quay lại danh sách hồ sơ
           </button>
           <button
             onClick={() => fetchDetail(true)}
@@ -365,14 +325,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
     );
   }
 
-  const statusConfig =
-    ASSESSOR_ONBOARDING_STATUS_CONFIG[detail.status] || {
-      label: detail.status,
-      bg: 'bg-slate-100',
-      text: 'text-slate-700',
-      border: 'border-slate-200',
-      desc: 'Trạng thái hiện tại của hồ sơ.',
-    };
+  const statusConfig = getAssessorOnboardingStatusConfig(detail.status);
 
   // Action permissions based on status
   const canRevoke = (
@@ -425,7 +378,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
           className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
-          Quay lại danh mục Onboarding
+          Quay lại danh sách hồ sơ assessor
         </button>
 
         <button
@@ -443,7 +396,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
           <div className="space-y-1.5">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-slate-700">
-                Hồ sơ Onboarding chuyên gia
+                Hồ sơ assessor
               </span>
               <span
                 className={`text-xs font-bold px-3 py-0.5 rounded-full border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
@@ -460,8 +413,8 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               {detail.fullName || detail.emailNormalized}
             </h1>
-            <p className="text-xs text-slate-500 font-mono">
-              Mã hồ sơ: <span className="font-semibold text-slate-700">{detail.id}</span>
+            <p className="text-xs text-slate-500">
+              Email: <span className="font-semibold text-slate-700">{detail.emailNormalized}</span>
             </p>
           </div>
 
@@ -563,62 +516,41 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
 
       {/* Detail Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card 1: Thông tin định danh & Tài khoản */}
+        {/* Card 1: Thông tin hồ sơ */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
             <UserCheck className="w-4 h-4 text-blue-600" />
-            Thông tin định danh chuyên gia
+            Thông tin hồ sơ
           </h2>
 
           <div className="space-y-3 text-xs">
             <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Họ và tên chuyên gia:</span>
+              <span className="text-slate-500">Họ và tên chuyên gia:</span>
               <span className="font-semibold text-slate-900">
-                {detail.fullName || 'Chưa cập nhật (đang chờ điền)'}
+                {detail.fullName || <span className="text-slate-400 font-normal">Chưa cung cấp</span>}
               </span>
             </div>
 
             <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Địa chỉ Email:</span>
-              <span className="font-medium text-slate-800">{detail.emailNormalized}</span>
+              <span className="text-slate-500">Địa chỉ Email:</span>
+              <span className="font-semibold text-slate-800">{detail.emailNormalized}</span>
             </div>
 
             <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Xác thực OTP Email:</span>
-              <span className="font-medium">
-                {detail.emailConfirmedAt ? (
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    Đã xác thực lúc {formatDateTime(detail.emailConfirmedAt)}
-                  </span>
-                ) : (
-                  <span className="text-slate-400 italic">Chưa xác thực</span>
-                )}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Tài khoản hệ thống (AccountId):</span>
-              <span className="font-medium">
-                {detail.accountId ? (
-                  <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">
-                    Đã cấp tài khoản
-                  </span>
-                ) : (
-                  <span className="text-slate-400 italic">Chưa cấp</span>
-                )}
-              </span>
+              <span className="text-slate-500">Trạng thái hồ sơ:</span>
+              <span className="font-semibold text-slate-800">{statusConfig.label}</span>
             </div>
 
             <div className="flex justify-between py-1.5">
-              <span className="text-slate-400">Kích hoạt tài khoản:</span>
+              <span className="text-slate-500">Kích hoạt tài khoản:</span>
               <span className="font-medium">
                 {detail.activatedAt ? (
-                  <span className="text-emerald-700 font-semibold">
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
                     Đã kích hoạt lúc {formatDateTime(detail.activatedAt)}
                   </span>
                 ) : (
-                  <span className="text-slate-400 italic">Chưa kích hoạt</span>
+                  <span className="text-slate-400">Chưa kích hoạt</span>
                 )}
               </span>
             </div>
@@ -629,90 +561,86 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
             <FileSignature className="w-4 h-4 text-indigo-600" />
-            Bằng chứng ký kết hợp đồng điện tử
+            Ký hợp đồng điện tử
           </h2>
 
           <div className="space-y-3 text-xs">
             <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Họ tên chữ ký số:</span>
+              <span className="text-slate-500">Họ tên chữ ký số:</span>
               <span className="font-semibold text-slate-900">
-                {detail.signedName || 'Chưa thực hiện ký'}
+                {detail.signedName || <span className="text-slate-400 font-normal">Chưa ký</span>}
               </span>
             </div>
 
             <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Thời điểm ký kết:</span>
+              <span className="text-slate-500">Thời điểm ký kết:</span>
               <span className="font-medium text-slate-800">
                 {formatDateTime(detail.signedAt)}
               </span>
             </div>
 
             <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Thời điểm chuyên gia mở xem PDF:</span>
+              <span className="text-slate-500">Xác thực OTP Email:</span>
+              <span className="font-medium">
+                {detail.emailConfirmedAt ? (
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    Đã xác thực lúc {formatDateTime(detail.emailConfirmedAt)}
+                  </span>
+                ) : (
+                  <span className="text-slate-400">Chưa xác thực</span>
+                )}
+              </span>
+            </div>
+
+            <div className="flex justify-between py-1.5 border-b border-slate-50">
+              <span className="text-slate-500">Thời điểm mở xem hợp đồng:</span>
               <span className="font-medium text-slate-800">
                 {formatDateTime(detail.contractViewedAt)}
               </span>
             </div>
 
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-400">Phiên bản mẫu hợp đồng:</span>
+            <div className="flex justify-between py-1.5">
+              <span className="text-slate-500">Phiên bản hợp đồng:</span>
               <span className="font-medium text-slate-800">
-                {detail.templateVersion || 'Chưa có thông tin'}
+                {detail.templateVersion || '—'}
               </span>
-            </div>
-
-            <div className="space-y-1 py-1">
-              <span className="text-slate-400 block">Mã băm toàn vẹn SHA-256:</span>
-              {detail.contractSha256 ? (
-                <code className="block p-2 bg-slate-50 rounded-lg border border-slate-200 text-[10px] font-mono text-slate-700 break-all select-all">
-                  {detail.contractSha256}
-                </code>
-              ) : (
-                <span className="text-slate-400 italic">Chưa tạo hợp đồng</span>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Card 3: Thông tin phê duyệt & Xử lý */}
+        {/* Card 3: Thông tin phê duyệt */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4 lg:col-span-2">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
             <Shield className="w-4 h-4 text-purple-600" />
-            Thông tin xét duyệt hồ sơ
+            Phê duyệt & Xét duyệt
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-              <span className="text-slate-400 block">Phương thức phê duyệt:</span>
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-500 block">Phương thức phê duyệt:</span>
               <span className="font-semibold text-slate-800">
-                {detail.autoApprove ? 'Tự động duyệt qua Worker' : 'Quản trị viên duyệt thủ công'}
+                {detail.autoApprove ? 'Tự động duyệt qua hệ thống' : 'Quản trị viên phê duyệt thủ công'}
               </span>
               {detail.autoApproveAt && (
-                <p className="text-[11px] text-slate-500">
-                  Lịch tự duyệt: {formatDateTime(detail.autoApproveAt)}
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Lịch tự duyệt dự kiến: {formatDateTime(detail.autoApproveAt)}
                 </p>
               )}
             </div>
 
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-              <span className="text-slate-400 block">Thời điểm xét duyệt:</span>
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-500 block">Thời điểm xét duyệt:</span>
               <span className="font-semibold text-slate-800">
                 {formatDateTime(detail.reviewedAt)}
               </span>
-              <p className="text-[11px] text-slate-500">
-                {detail.reviewedByAccountId
-                  ? 'Thực hiện bởi quản trị viên'
-                  : detail.reviewedAt
-                  ? 'Hệ thống tự động phê duyệt'
-                  : 'Chưa xét duyệt'}
-              </p>
             </div>
 
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1 sm:col-span-2 lg:col-span-1">
-              <span className="text-slate-400 block">Ghi chú / Lý do kết quả duyệt:</span>
-              <span className="font-semibold text-slate-800 block">
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 sm:col-span-2 lg:col-span-1">
+              <span className="text-slate-500 block">Ghi chú / Lý do xét duyệt:</span>
+              <span className="font-medium text-slate-800 block">
                 {detail.reviewReason || (
-                  <span className="text-slate-400 italic font-normal">Không có ghi chú thêm</span>
+                  <span className="text-slate-400 italic">Không có ghi chú thêm</span>
                 )}
               </span>
             </div>
@@ -728,7 +656,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-600" />
                 <h3 className="text-sm font-bold text-slate-900">
-                  Bản thảo hợp đồng điện tử - {detail.fullName || detail.emailNormalized}
+                  Bản hợp đồng điện tử — {detail.fullName || detail.emailNormalized}
                 </h3>
               </div>
               <button
@@ -742,8 +670,8 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
             <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
               {isLoadingPdf ? (
                 <div className="text-center text-slate-500 space-y-2">
-                  <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-xs font-medium">Đang tải bản hợp đồng PDF bảo mật...</p>
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
+                  <p className="text-xs font-medium">Đang tải bản hợp đồng PDF...</p>
                 </div>
               ) : pdfError ? (
                 <div className="p-6 text-center space-y-3 bg-white rounded-2xl border border-red-200 max-w-md shadow-sm">
@@ -760,7 +688,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
               ) : pdfBlobUrl ? (
                 <iframe
                   src={pdfBlobUrl}
-                  title="Bản thảo hợp đồng PDF"
+                  title="Bản hợp đồng PDF"
                   className="w-full h-full border-none"
                 />
               ) : null}
@@ -792,20 +720,19 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
                 Xác nhận phê duyệt hồ sơ chuyên gia?
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Hồ sơ đã được ký tên và xác thực email. Phê duyệt sẽ cấp tài khoản thẩm định viên và
-                gửi liên kết đặt mật khẩu cho chuyên gia{' '}
+                Hồ sơ đã được ký tên và xác thực email. Phê duyệt sẽ cấp tài khoản thẩm định viên và gửi liên kết đặt mật khẩu cho chuyên gia{' '}
                 <strong className="text-slate-900">{detail.fullName || detail.emailNormalized}</strong>.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsApproveConfirmOpen(false)}
                 disabled={isApproving}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-xl transition"
               >
-                Hủy bỏ
+                Hủy
               </button>
               <button
                 type="button"
@@ -813,19 +740,15 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
                 disabled={isApproving}
                 className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
               >
-                {isApproving ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Check className="w-3.5 h-3.5" />
-                )}
-                <span>Xác nhận phê duyệt</span>
+                {isApproving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isApproving ? 'Đang phê duyệt...' : 'Xác nhận phê duyệt'}</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Reject Form */}
+      {/* Modal: Reject with Reason */}
       {isRejectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
@@ -842,7 +765,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleReject} className="space-y-3 text-xs">
+            <form onSubmit={handleReject} className="space-y-4 text-xs">
               {rejectError && (
                 <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -852,41 +775,38 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
 
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700 block">
-                  Lý do từ chối <span className="text-red-500">*</span>
+                  Lý do từ chối hồ sơ <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Nhập lý do cụ thể gửi đến chuyên gia (ví dụ: Thông tin chữ ký chưa khớp với giấy tờ, vui lòng khai báo lại)..."
+                  placeholder="Nhập lý do chi tiết từ chối hồ sơ..."
                   rows={4}
                   maxLength={2000}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                 />
-                <p className="text-[11px] text-slate-400">
-                  Lưu ý: Lý do này sẽ được gửi trực tiếp qua email cho chuyên gia. Không nhập ghi chú nội bộ.
-                </p>
+                <div className="flex justify-between text-[11px] text-slate-400">
+                  <span>Lý do này sẽ được gửi thông báo đến email chuyên gia.</span>
+                  <span>{rejectReason.length}/2000</span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsRejectModalOpen(false)}
                   disabled={isSubmittingReject}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-xl transition"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingReject}
+                  disabled={isSubmittingReject || !rejectReason.trim()}
                   className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {isSubmittingReject ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5" />
-                  )}
-                  <span>Xác nhận từ chối</span>
+                  {isSubmittingReject && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmittingReject ? 'Đang gửi...' : 'Xác nhận từ chối'}</span>
                 </button>
               </div>
             </form>
@@ -904,23 +824,25 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <h3 className="text-sm font-bold text-slate-900">
-                Xác nhận thu hồi lời mời onboarding?
+                Thu hồi lời mời Onboarding?
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Bạn đang chuẩn bị thu hồi hồ sơ onboarding của chuyên gia{' '}
-                <strong className="text-slate-900">{detail.emailNormalized}</strong>. Sau khi thu hồi,
-                đường dẫn khai báo và hợp đồng hiện tại sẽ bị vô hiệu hóa hoàn toàn.
+                Hành động này sẽ hủy bỏ hiệu lực của lời mời/hồ sơ của chuyên gia{' '}
+                <strong className="text-slate-900">
+                  {detail.fullName || detail.emailNormalized}
+                </strong>
+                . Đường dẫn khai báo hoặc ký hợp đồng sẽ không còn sử dụng được.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsRevokeConfirmOpen(false)}
                 disabled={isRevoking}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-xl transition"
               >
-                Hủy bỏ
+                Hủy
               </button>
               <button
                 type="button"
@@ -928,12 +850,8 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
                 disabled={isRevoking}
                 className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
               >
-                {isRevoking ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Trash2 className="w-3.5 h-3.5" />
-                )}
-                <span>Xác nhận thu hồi</span>
+                {isRevoking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isRevoking ? 'Đang thu hồi...' : 'Xác nhận thu hồi'}</span>
               </button>
             </div>
           </div>

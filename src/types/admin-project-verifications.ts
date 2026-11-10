@@ -403,6 +403,38 @@ export interface SuitableVerificatorResponse {
   fullName: string;
 }
 
+export interface SuitableAssessorSpecialization {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface SuitableAssessorItem {
+  userId: string;
+  accountId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  jobTitle: string | null;
+  yearsOfExperience: number;
+  specialization: SuitableAssessorSpecialization;
+}
+
+export interface SuitableAssessorsResponse {
+  projectId: string;
+  specialization: SuitableAssessorSpecialization;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  assessors: SuitableAssessorItem[];
+}
+
+export interface AssessorAvailabilityItem {
+  userId: string;
+  fullName: string;
+}
+
 export interface CreateAssignmentRequest {
   projectVerificationId: string;
   assignedToUserId: string;
