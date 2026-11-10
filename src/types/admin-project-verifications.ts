@@ -507,6 +507,12 @@ export interface VerificationProjectResponse {
   id: string;
   title: string;
   projectField: string;
+  specialization?: {
+    id: string;
+    code: string;
+    name: string;
+    isActive: boolean;
+  } | null;
   description: string;
   status: BackendProjectStatus;
   leaderId?: string | null;

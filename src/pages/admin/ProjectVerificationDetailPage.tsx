@@ -418,6 +418,14 @@ export const ProjectVerificationDetailPage: React.FC = () => {
               <span className="font-medium text-slate-700">
                 {project.projectField || 'Chưa phân loại'}
               </span>{' '}
+              {project.specialization && (
+                <>
+                  | Chuyên ngành:{' '}
+                  <span className="font-medium text-slate-700">
+                    {project.specialization.name}
+                  </span>{' '}
+                </>
+              )}
               | Trạng thái dự án:{' '}
               <span
                 className={`inline-block px-2 py-0.2 rounded text-[11px] font-medium border ${projectStatusStyle.bg} ${projectStatusStyle.text} ${projectStatusStyle.border}`}
@@ -549,6 +557,11 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                   <span className="text-slate-400 font-medium">Lĩnh vực chuyên môn:</span>
                   <p className="font-medium text-slate-700">
                     {project.projectField || 'Chưa phân loại'}
+                    {project.specialization && (
+                      <span className="text-xs text-slate-500 block mt-0.5">
+                        Chuyên ngành: {project.specialization.name}
+                      </span>
+                    )}
                   </p>
                 </div>
 

@@ -37,6 +37,7 @@ const routes: Record<UserRole, readonly string[]> = {
     '/admin/notifications',
     '/admin/activity-logs',
     '/admin/skills',
+    '/admin/specializations',
     '/admin/projects',
     '/admin/project-verifications',
     '/admin/service-packages',
