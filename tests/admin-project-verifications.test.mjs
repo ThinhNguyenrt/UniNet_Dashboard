@@ -72,10 +72,12 @@ test('safeNotificationTarget accepts project verification list and detail deep l
   assert.equal(safeNotificationTarget(validDetail, 'accountant'), null);
 });
 
-test('ProjectOrigin enum matches backend (Internal=0, External=1)', async () => {
-  const { ProjectOrigin } = await import('../src/types/admin-project-verifications.ts');
-  assert.equal(ProjectOrigin.Internal, 0);
-  assert.equal(ProjectOrigin.External, 1);
+test('project verification no longer exposes project classification', async () => {
+  const contract = await import('../src/types/admin-project-verifications.ts');
+  assert.equal('ProjectOrigin' in contract, false);
+  const { readFileSync } = await import('node:fs');
+  const detail = readFileSync('src/pages/admin/ProjectVerificationDetailPage.tsx', 'utf8');
+  assert.doesNotMatch(detail, /Loại dự án|Nguồn dự án|project\.origin/);
 });
 
 test('ProjectVerificationDetailPage does not display raw UUIDs in user-facing JSX', async () => {

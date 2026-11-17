@@ -471,12 +471,6 @@ export interface VerificationPaymentResponse {
 
 // 7. Project & Verification Responses
 
-export const ProjectOrigin = {
-  Internal: 0,
-  External: 1,
-} as const;
-export type ProjectOrigin = (typeof ProjectOrigin)[keyof typeof ProjectOrigin];
-
 export interface ProjectSkillInfo {
   skillId: string;
   skillName: string;
@@ -548,7 +542,6 @@ export interface VerificationProjectResponse {
   description: string;
   status: BackendProjectStatus;
   leaderId?: string | null;
-  origin?: ProjectOrigin;
   ownerUserId?: string | null;
   leader?: ProjectLeaderInfo | null;
   externalDetails?: ExternalProjectDraftData | null;

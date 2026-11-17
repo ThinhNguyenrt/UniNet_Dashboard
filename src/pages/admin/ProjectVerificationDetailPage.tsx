@@ -565,16 +565,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-slate-400 font-medium">Loại hình hồ sơ:</span>
-                  <p>
-                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                      {project.origin === 1
-                        ? 'Dự án nhập từ tài liệu'
-                        : 'Dự án trên nền tảng UniNet'}
-                    </span>
-                  </p>
-                </div>
+
               </div>
 
               <div className="space-y-1 pt-2 border-t border-slate-100">
