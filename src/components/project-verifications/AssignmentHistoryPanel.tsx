@@ -75,6 +75,22 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
     }
   };
 
+  const activeAssignment =
+    assignments.find(
+      (a) =>
+        (a.status === VerificationAssignmentStatus.Assigned ||
+          a.status === VerificationAssignmentStatus.Overdue) &&
+        !a.replacedAt &&
+        !a.report
+    ) ||
+    assignments.find(
+      (a) =>
+        (a.status === VerificationAssignmentStatus.Assigned ||
+          a.status === VerificationAssignmentStatus.Overdue) &&
+        !a.replacedAt
+    ) ||
+    (assignments.length > 0 && !assignments[0].replacedAt ? assignments[0] : null);
+
   const hasActiveAssignment = assignments.some(
     (a) =>
       a.status === VerificationAssignmentStatus.Assigned ||
@@ -106,6 +122,26 @@ export const AssignmentHistoryPanel: React.FC<AssignmentHistoryPanelProps> = ({
           >
             <UserCheck className="w-4 h-4" />
             Phân công thẩm định viên
+          </button>
+        )}
+
+        {hasActiveAssignment && canReassign && activeAssignment && (
+          <button
+            onClick={() => {
+              const resolvedFullName =
+                activeAssignment.assignedToFullName ||
+                verificatorNameMap?.[activeAssignment.assignedToUserId] ||
+                assignmentDetails[activeAssignment.id]?.assignedToUser?.fullName ||
+                null;
+              onOpenReplaceDialog({
+                ...activeAssignment,
+                assignedToFullName: resolvedFullName,
+              });
+            }}
+            className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Thay thế thẩm định viên
           </button>
         )}
       </div>
