@@ -15,6 +15,8 @@ import {
   Globe,
   GitBranch,
   Info,
+  RefreshCw,
+  UserCheck,
 } from 'lucide-react';
 import { adminProjectVerificationsService } from '../../services/admin-project-verifications.service';
 import { adminAssignmentsService } from '../../services/admin-assignments.service';
@@ -33,6 +35,8 @@ import {
   backendProjectStatusLabels,
   backendProjectStatusStyles,
   VerificationAssignmentStatus,
+  verificationAssignmentStatusLabels,
+  verificationAssignmentStatusStyles,
 } from '../../types/admin-project-verifications';
 import { getApiErrorMessage } from '../../services/api';
 import { AssignVerificatorDialog } from '../../components/project-verifications/AssignVerificatorDialog';
@@ -189,7 +193,14 @@ export const ProjectVerificationDetailPage: React.FC = () => {
   };
 
   const handleOpenReplace = (assignment: VerificationAssignmentResponse) => {
-    setSelectedAssignmentToReplace(assignment);
+    const resolvedFullName =
+      assignment.assignedToFullName ||
+      verificatorNameMap[assignment.assignedToUserId] ||
+      null;
+    setSelectedAssignmentToReplace({
+      ...assignment,
+      assignedToFullName: resolvedFullName,
+    });
     setIsReplaceDialogOpen(true);
   };
 
@@ -248,13 +259,36 @@ export const ProjectVerificationDetailPage: React.FC = () => {
   // Logic điều kiện cho phép phân công hoặc thay người:
   const isCasePending =
     verification.status === ProjectVerificationStatus.Pending && !finalResult?.finalizedAt;
-  const hasActiveAssignment = assignments.some(
-    (a) =>
-      a.status === VerificationAssignmentStatus.Assigned ||
-      a.status === VerificationAssignmentStatus.Overdue
-  );
+
+  // Xác định phân công đang hoạt động hiện tại (Assigned hoặc Overdue, chưa hoàn thành và chưa bị thay thế)
+  const activeAssignment =
+    assignments.find(
+      (a) =>
+        (a.status === VerificationAssignmentStatus.Assigned ||
+          a.status === VerificationAssignmentStatus.Overdue) &&
+        !a.replacedAt &&
+        !a.report
+    ) ||
+    assignments.find(
+      (a) =>
+        (a.status === VerificationAssignmentStatus.Assigned ||
+          a.status === VerificationAssignmentStatus.Overdue) &&
+        !a.replacedAt
+    ) ||
+    assignments.find(
+      (a) =>
+        a.status !== VerificationAssignmentStatus.Cancelled &&
+        a.status !== VerificationAssignmentStatus.Completed &&
+        !a.replacedAt
+    ) ||
+    null;
+
+  const hasActiveAssignment = Boolean(activeAssignment);
+  // Nếu chưa phân công thì hiện nút phân công khi xem chi tiết
   const canAssign = isCasePending && !hasActiveAssignment;
-  const canReassign = isCasePending;
+  // Nếu đã phân công rồi thì không hiện phân công nữa, mà thay vào đó khi xem chi tiết sẽ hiện nút thay thế
+  const canReplace = isCasePending && Boolean(activeAssignment) && !activeAssignment?.report;
+  const canReassign = canReplace;
 
   // Xây dựng danh sách thành viên hoàn chỉnh bao gồm cả trưởng nhóm
   const combinedMembers = (() => {
@@ -439,11 +473,25 @@ export const ProjectVerificationDetailPage: React.FC = () => {
           <div className="flex items-center gap-2.5 self-start lg:self-auto">
             {canAssign && (
               <button
+                type="button"
                 onClick={() => setIsAssignDialogOpen(true)}
                 className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                title="Phân công chuyên gia thẩm định cho hồ sơ này"
               >
                 <Users className="w-4 h-4" />
                 Phân công người thẩm định
+              </button>
+            )}
+
+            {canReplace && activeAssignment && (
+              <button
+                type="button"
+                onClick={() => handleOpenReplace(activeAssignment)}
+                className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                title="Thay thế người thẩm định cho hồ sơ này"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Thay thế người thẩm định
               </button>
             )}
           </div>
@@ -540,6 +588,106 @@ export const ProjectVerificationDetailPage: React.FC = () => {
       <div>
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* Assignment Status Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-blue-600" />
+                  Thông tin phân công thẩm định
+                </h3>
+                {activeAssignment && (
+                  <span
+                    className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${
+                      verificationAssignmentStatusStyles[activeAssignment.status]?.bg || 'bg-blue-50'
+                    } ${
+                      verificationAssignmentStatusStyles[activeAssignment.status]?.text || 'text-blue-700'
+                    } ${
+                      verificationAssignmentStatusStyles[activeAssignment.status]?.border || 'border-blue-200'
+                    }`}
+                  >
+                    {verificationAssignmentStatusLabels[activeAssignment.status] || 'Đang phân công'}
+                  </span>
+                )}
+              </div>
+
+              {activeAssignment ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">Người thẩm định phụ trách:</span>
+                      <p className="font-bold text-slate-800 text-sm">
+                        {activeAssignment.assignedToFullName ||
+                          verificatorNameMap[activeAssignment.assignedToUserId] ||
+                          'Chuyên gia thẩm định'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">Thời điểm phân công:</span>
+                      <p className="font-medium text-slate-700">
+                        {formatDate(activeAssignment.assignedAt)}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">Hạn nộp báo cáo:</span>
+                      <p className="font-medium text-slate-700">
+                        {formatDate(activeAssignment.reportDueAt)}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">Tiến độ báo cáo:</span>
+                      <p className="font-medium text-slate-700">
+                        {activeAssignment.report ? (
+                          <span className="text-emerald-600 font-semibold">Đã gửi báo cáo</span>
+                        ) : (
+                          <span className="text-amber-600 font-semibold">Chưa nộp báo cáo</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canReplace && (
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100 flex-wrap gap-3">
+                      <p className="text-xs text-slate-500">
+                        Cần chuyển giao hồ sơ cho người thẩm định khác do bận đột xuất hoặc quá hạn?
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReplace(activeAssignment)}
+                        className="px-3.5 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Thay thế người thẩm định
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-amber-900">
+                      Hồ sơ chưa được phân công người thẩm định
+                    </p>
+                    <p className="text-xs text-amber-700">
+                      Vui lòng phân công một chuyên gia thẩm định phù hợp với chuyên ngành dự án để tiến hành đánh giá hồ sơ.
+                    </p>
+                  </div>
+                  {canAssign && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAssignDialogOpen(true)}
+                      className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors flex items-center gap-2 shrink-0"
+                    >
+                      <Users className="w-4 h-4" />
+                      Phân công người thẩm định
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Project Details */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -1005,6 +1153,8 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         }}
         assignment={selectedAssignmentToReplace}
         projectVerificationId={verification.id}
+        projectId={project.id}
+        projectTitle={project.title}
         onSuccess={handleRefresh}
       />
     </div>

@@ -158,3 +158,53 @@ test('VerificationReportView does not expose raw report.id UUID', async () => {
   assert.doesNotMatch(reportContent, /Mã báo cáo:\s*<span[^>]*>\{report\.id\}<\/span>/);
 });
 
+test('ProjectVerificationsPage does not show assignment button outside record in table', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const listPageContent = fs.readFileSync(
+    path.resolve('src/pages/admin/ProjectVerificationsPage.tsx'),
+    'utf-8'
+  );
+
+  // Must not have assign button or assign dialog item outside records
+  assert.doesNotMatch(listPageContent, /Phân công assessor/);
+  assert.doesNotMatch(listPageContent, /AssignVerificatorDialog/);
+  assert.doesNotMatch(listPageContent, /setAssignDialogItem/);
+  // Must still have Chi tiết button
+  assert.match(listPageContent, /Chi tiết/);
+});
+
+test('ProjectVerificationDetailPage shows assign when unassigned and replace when assigned', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const detailContent = fs.readFileSync(
+    path.resolve('src/pages/admin/ProjectVerificationDetailPage.tsx'),
+    'utf-8'
+  );
+
+  // Must have logic for both canAssign and canReplace
+  assert.match(detailContent, /canAssign/);
+  assert.match(detailContent, /canReplace/);
+  assert.match(detailContent, /activeAssignment/);
+
+  // Quick actions must show replace button when active assignment exists
+  assert.match(detailContent, /Thay thế người thẩm định/);
+  // Overview tab must display assignment status card
+  assert.match(detailContent, /Thông tin phân công thẩm định/);
+});
+
+test('ReplaceVerificatorDialog invokes replaceVerificator with assignment.id and reason', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const dialogContent = fs.readFileSync(
+    path.resolve('src/components/project-verifications/ReplaceVerificatorDialog.tsx'),
+    'utf-8'
+  );
+
+  // Must invoke adminAssignmentsService.replaceVerificator with assignment.id
+  assert.match(dialogContent, /adminAssignmentsService\.replaceVerificator\(assignment\.id/);
+  assert.match(dialogContent, /assignedToUserId:\s*selectedUserId/);
+  assert.match(dialogContent, /reason:\s*trimmedReason/);
+});
+
+

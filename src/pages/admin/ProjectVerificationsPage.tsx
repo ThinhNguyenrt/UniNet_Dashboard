@@ -11,13 +11,11 @@ import {
   ExternalLink,
   Loader2,
   FileText,
-  UserCheck,
 } from 'lucide-react';
 import { adminProjectVerificationsService } from '../../services/admin-project-verifications.service';
 import type {
   ProjectVerificationsResponse,
   ProjectVerificationFilter,
-  ProjectVerificationResponse,
 } from '../../types/admin-project-verifications';
 import {
   ProjectVerificationStatus,
@@ -28,7 +26,6 @@ import {
   verificationBookingStatusStyles,
 } from '../../types/admin-project-verifications';
 import { getApiErrorMessage } from '../../services/api';
-import { AssignVerificatorDialog } from '../../components/project-verifications/AssignVerificatorDialog';
 
 type TabMode = 'all' | 'pending' | 'overdue';
 
@@ -41,7 +38,6 @@ export const ProjectVerificationsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
-  const [assignDialogItem, setAssignDialogItem] = useState<ProjectVerificationResponse | null>(null);
 
   // Filters state for "all" tab
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -392,20 +388,6 @@ export const ProjectVerificationsPage: React.FC = () => {
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {item.status === ProjectVerificationStatus.Pending && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAssignDialogItem(item);
-                              }}
-                              className="px-2.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition inline-flex items-center gap-1.5 shadow-xs"
-                              title="Phân công assessor cho hồ sơ thẩm định này"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Phân công assessor</span>
-                            </button>
-                          )}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -461,20 +443,6 @@ export const ProjectVerificationsPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Assign Verificator Dialog */}
-      {assignDialogItem && (
-        <AssignVerificatorDialog
-          isOpen={Boolean(assignDialogItem)}
-          onClose={() => setAssignDialogItem(null)}
-          projectVerificationId={assignDialogItem.id}
-          projectId={assignDialogItem.projectId}
-          projectTitle={assignDialogItem.projectTitle}
-          scheduledStartAt={assignDialogItem.scheduledStartAt}
-          scheduledEndAt={assignDialogItem.scheduledEndAt}
-          onSuccess={handleRefresh}
-        />
-      )}
     </div>
   );
 };
