@@ -207,4 +207,46 @@ test('ReplaceVerificatorDialog invokes replaceVerificator with assignment.id and
   assert.match(dialogContent, /reason:\s*trimmedReason/);
 });
 
+test('ProjectVerificationDetailPage includes update specialization button and dialog', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const detailContent = fs.readFileSync(
+    path.resolve('src/pages/admin/ProjectVerificationDetailPage.tsx'),
+    'utf-8'
+  );
+
+  // Must have update specialization button in header & overview
+  assert.match(detailContent, /Cập nhật chuyên ngành/);
+  assert.match(detailContent, /UpdateProjectSpecializationDialog/);
+  assert.match(detailContent, /isUpdateSpecializationOpen/);
+});
+
+test('adminProjectVerificationsService has updateProjectSpecialization endpoint', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const serviceContent = fs.readFileSync(
+    path.resolve('src/services/admin-project-verifications.service.ts'),
+    'utf-8'
+  );
+
+  // Must have updateProjectSpecialization calling PUT /admin/projects/${encodeURIComponent(projectId)}/specialization
+  assert.match(serviceContent, /updateProjectSpecialization/);
+  assert.match(serviceContent, /\/admin\/projects\/\$\{encodeURIComponent\(projectId\)\}\/specialization/);
+  assert.match(serviceContent, /specializationId/);
+});
+
+test('UpdateProjectSpecializationDialog invokes updateProjectSpecialization with projectId and specializationId', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const dialogContent = fs.readFileSync(
+    path.resolve('src/components/project-verifications/UpdateProjectSpecializationDialog.tsx'),
+    'utf-8'
+  );
+
+  assert.match(dialogContent, /adminProjectVerificationsService\.updateProjectSpecialization/);
+  assert.match(dialogContent, /projectId/);
+  assert.match(dialogContent, /selectedSpecializationId/);
+});
+
+
 

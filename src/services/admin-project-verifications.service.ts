@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { apiClient } from './api';
 import type {
   ProjectVerificationsResponse,
@@ -6,6 +7,7 @@ import type {
   VerificationReportResponse,
   VerificationRefundResponse,
   ProjectVerificationFilter,
+  SuitableAssessorSpecialization,
 } from '../types/admin-project-verifications';
 
 const packageCache = new Map<string, { id: string; name: string; code: string; price: number }>();
@@ -132,6 +134,40 @@ export const adminProjectVerificationsService = {
       return response.data;
     } catch {
       return null;
+    }
+  },
+
+  /**
+   * Cập nhật chuyên ngành của dự án
+   * PUT /api/admin/projects/{projectId}/specialization
+   * Request body: { specializationId }
+   */
+  async updateProjectSpecialization(
+    projectId: string,
+    specializationId: string,
+    signal?: AbortSignal
+  ): Promise<SuitableAssessorSpecialization> {
+    try {
+      const response = await apiClient.put<SuitableAssessorSpecialization>(
+        `/admin/projects/${encodeURIComponent(projectId)}/specialization`,
+        { specializationId },
+        { signal }
+      );
+      return response.data;
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 400 && !signal?.aborted) {
+        try {
+          const fallbackRes = await apiClient.put<SuitableAssessorSpecialization>(
+            `/admin/projects/${encodeURIComponent(projectId)}/specialization`,
+            JSON.stringify(specializationId),
+            { headers: { 'Content-Type': 'application/json' }, signal }
+          );
+          return fallbackRes.data;
+        } catch {
+          throw err;
+        }
+      }
+      throw err;
     }
   },
 };
