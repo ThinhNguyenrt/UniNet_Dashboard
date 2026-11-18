@@ -17,12 +17,14 @@ import {
   Info,
   RefreshCw,
   UserCheck,
+  BookOpen,
 } from 'lucide-react';
 import { adminProjectVerificationsService } from '../../services/admin-project-verifications.service';
 import { adminAssignmentsService } from '../../services/admin-assignments.service';
 import type {
   ProjectVerificationDetailResponse,
   VerificationAssignmentResponse,
+  SuitableAssessorSpecialization,
 } from '../../types/admin-project-verifications';
 import {
   ProjectVerificationStatus,
@@ -43,6 +45,7 @@ import { AssignVerificatorDialog } from '../../components/project-verifications/
 import { ReplaceVerificatorDialog } from '../../components/project-verifications/ReplaceVerificatorDialog';
 import { AssignmentHistoryPanel } from '../../components/project-verifications/AssignmentHistoryPanel';
 import { VerificationReportView } from '../../components/project-verifications/VerificationReportView';
+import { UpdateProjectSpecializationDialog } from '../../components/project-verifications/UpdateProjectSpecializationDialog';
 
 type DetailTab = 'overview' | 'assignments' | 'report' | 'payments';
 
@@ -69,6 +72,7 @@ export const ProjectVerificationDetailPage: React.FC = () => {
   // Dialog states
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState<boolean>(false);
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState<boolean>(false);
+  const [isUpdateSpecializationOpen, setIsUpdateSpecializationOpen] = useState<boolean>(false);
   const [selectedAssignmentToReplace, setSelectedAssignmentToReplace] =
     useState<VerificationAssignmentResponse | null>(null);
 
@@ -202,6 +206,19 @@ export const ProjectVerificationDetailPage: React.FC = () => {
       assignedToFullName: resolvedFullName,
     });
     setIsReplaceDialogOpen(true);
+  };
+
+  const handleSpecializationUpdated = (updated: SuitableAssessorSpecialization) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        project: {
+          ...prev.project,
+          specialization: updated,
+        },
+      };
+    });
   };
 
   const isDifferentProject = Boolean(detail && id && detail.verification.id !== id);
@@ -447,30 +464,59 @@ export const ProjectVerificationDetailPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               {project.title}
             </h1>
-            <p className="text-xs text-slate-500">
-              Lĩnh vực:{' '}
-              <span className="font-medium text-slate-700">
-                {project.projectField || 'Chưa phân loại'}
-              </span>{' '}
-              {project.specialization && (
-                <>
-                  | Chuyên ngành:{' '}
-                  <span className="font-medium text-slate-700">
-                    {project.specialization.name}
-                  </span>{' '}
-                </>
-              )}
-              | Trạng thái dự án:{' '}
-              <span
-                className={`inline-block px-2 py-0.2 rounded text-[11px] font-medium border ${projectStatusStyle.bg} ${projectStatusStyle.text} ${projectStatusStyle.border}`}
-              >
-                {backendProjectStatusLabels[project.status]}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <span>
+                Lĩnh vực:{' '}
+                <strong className="text-slate-700">
+                  {project.projectField || 'Chưa phân loại'}
+                </strong>
               </span>
-            </p>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1.5">
+                Chuyên ngành:{' '}
+                {project.specialization ? (
+                  <strong className="text-slate-800">
+                    {project.specialization.name}
+                  </strong>
+                ) : (
+                  <span className="text-amber-600 font-medium italic">
+                    Chưa gán chuyên ngành
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsUpdateSpecializationOpen(true)}
+                  className="px-2 py-0.5 text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 border border-blue-200 rounded transition inline-flex items-center gap-1"
+                  title="Cập nhật chuyên ngành cho dự án này"
+                >
+                  <BookOpen className="w-3 h-3" />
+                  <span>Cập nhật</span>
+                </button>
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1">
+                Trạng thái dự án:
+                <span
+                  className={`inline-block px-2 py-0.2 rounded text-[11px] font-medium border ${projectStatusStyle.bg} ${projectStatusStyle.text} ${projectStatusStyle.border}`}
+                >
+                  {backendProjectStatusLabels[project.status]}
+                </span>
+              </span>
+            </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-2.5 self-start lg:self-auto">
+          <div className="flex items-center gap-2.5 self-start lg:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsUpdateSpecializationOpen(true)}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              title="Cập nhật chuyên ngành của dự án"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+              Cập nhật chuyên ngành
+            </button>
+
             {canAssign && (
               <button
                 type="button"
@@ -702,12 +748,29 @@ export const ProjectVerificationDetailPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-slate-400 font-medium">Lĩnh vực chuyên môn:</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Lĩnh vực & Chuyên ngành:</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsUpdateSpecializationOpen(true)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1"
+                      title="Cập nhật chuyên ngành của dự án"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      Cập nhật chuyên ngành
+                    </button>
+                  </div>
                   <p className="font-medium text-slate-700">
                     {project.projectField || 'Chưa phân loại'}
-                    {project.specialization && (
-                      <span className="text-xs text-slate-500 block mt-0.5">
-                        Chuyên ngành: {project.specialization.name}
+                    {project.specialization ? (
+                      <span className="text-xs text-slate-600 block mt-0.5">
+                        Chuyên ngành:{' '}
+                        <strong className="text-slate-800">{project.specialization.name}</strong>{' '}
+                        <span className="text-[11px] text-slate-400 font-mono">({project.specialization.code})</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-600 block mt-0.5 font-medium">
+                        Dự án chưa được gán chuyên ngành
                       </span>
                     )}
                   </p>
@@ -1156,6 +1219,15 @@ export const ProjectVerificationDetailPage: React.FC = () => {
         projectId={project.id}
         projectTitle={project.title}
         onSuccess={handleRefresh}
+      />
+
+      <UpdateProjectSpecializationDialog
+        isOpen={isUpdateSpecializationOpen}
+        onClose={() => setIsUpdateSpecializationOpen(false)}
+        projectId={project.id}
+        projectTitle={project.title}
+        currentSpecialization={project.specialization}
+        onSuccess={handleSpecializationUpdated}
       />
     </div>
   );
