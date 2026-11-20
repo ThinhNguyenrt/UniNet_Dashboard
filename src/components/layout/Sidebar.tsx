@@ -36,10 +36,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed = f
     'admin-project-moderation': 'project.review',
     'admin-job-postings': 'recruitment.review',
     'admin-community-posts': 'community.review',
+    'admin-complaints': 'community.review',
     'admin-projects': 'verification.evidence.review',
     'admin-notification-broadcasts': 'notifications.manage',
     'admin-specializations': 'staff.manage',
     'moderator-projects': 'project.review',
+    'moderator-community-posts': 'community.review',
+    'moderator-complaints': 'community.review',
     'accountant-statistics': 'finance.view',
     'accountant-withdrawals': 'finance.view',
   };
