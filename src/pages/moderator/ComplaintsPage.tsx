@@ -393,9 +393,6 @@ export const ComplaintsPage: React.FC = () => {
                       <div className="font-semibold text-slate-900 truncate">
                         {item.authorName?.trim() || 'Người dùng ẩn danh'}
                       </div>
-                      <div className="text-[10px] font-mono text-slate-400 truncate" title={item.authorUserId}>
-                        {item.authorUserId}
-                      </div>
                     </td>
 
                     {/* Description snippet */}
@@ -426,9 +423,6 @@ export const ComplaintsPage: React.FC = () => {
                     <td className="p-3.5 max-w-[140px]">
                       <div className="font-medium text-slate-800 truncate">
                         {item.reporterName?.trim() || 'Người dùng ẩn danh'}
-                      </div>
-                      <div className="text-[10px] font-mono text-slate-400 truncate" title={item.reporterUserId}>
-                        {item.reporterUserId}
                       </div>
                     </td>
 
