@@ -2,6 +2,7 @@ export const adminPermissions = {
   usersView: 'users.view', usersDetail: 'users.detail', usersLock: 'users.lock', usersUnlock: 'users.unlock',
   studentReview: 'verification.student.review', partnerReview: 'verification.partner.review',
   staffManage: 'staff.manage', permissionsManage: 'permissions.manage',
+  communityReview: 'community.review',
 } as const;
 export const permissionLabels: Record<string, string> = {
   'finance.view': 'Xem giao dịch và báo cáo tài chính', 'finance.wallet.credit': 'Ghi nhận thu nhập vào ví',

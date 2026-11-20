@@ -78,7 +78,13 @@ export function safeNotificationTarget(target: string | null | undefined, role: 
   if (target === '/notifications') return `/${role}/notifications`;
   try {
     const url = new URL(target, 'https://dashboard.invalid');
-    const managementKinds = role === 'admin' || role === 'verifier' ? ['users', 'student-verifications', 'partner-verifications', 'project-verifications'] : role === 'moderator' ? ['users'] : [];
+    const managementKinds = role === 'admin'
+      ? ['users', 'student-verifications', 'partner-verifications', 'project-verifications', 'community-posts', 'complaints']
+      : role === 'verifier'
+      ? ['users', 'student-verifications', 'partner-verifications', 'project-verifications']
+      : role === 'moderator'
+      ? ['users', 'community-posts', 'complaints']
+      : [];
     const managementDetail = managementKinds.some(kind => new RegExp('^/' + role + '/' + kind + '/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').test(url.pathname));
     const managementList = managementKinds.some(path => url.pathname === '/' + role + '/' + path);
     if (url.origin !== 'https://dashboard.invalid' || !routes[role].includes(url.pathname) && !managementDetail && !managementList) return null;

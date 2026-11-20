@@ -29,6 +29,7 @@ import { CareerProfilesPage } from './pages/moderator/CareerProfilesPage';
 import { CommunityPostsPage } from './pages/moderator/CommunityPostsPage';
 import { AdvertisementsPage } from './pages/moderator/AdvertisementsPage';
 import { ComplaintsPage } from './pages/moderator/ComplaintsPage';
+import { ComplaintDetailPage } from './pages/moderator/ComplaintDetailPage';
 
 // Shared / Management Pages
 import { NotificationsPage } from './pages/NotificationsPage';
@@ -98,6 +99,7 @@ export const App: React.FC = () => {
             <Route path="project-moderation" element={<ModeratorProjectsPage />} />
             <Route path="community-posts" element={<CommunityPostsPage />} />
             <Route path="complaints" element={<ComplaintsPage />} />
+            <Route path="complaints/:reportId" element={<ComplaintDetailPage />} />
             <Route path="career-profiles" element={<CareerProfilesPage />} />
             <Route path="job-postings" element={<JobPostingsPage />} />
             <Route path="projects" element={<AdminProjectsPage />} />
@@ -136,6 +138,7 @@ export const App: React.FC = () => {
             <Route path="projects" element={<ModeratorProjectsPage />} />
             <Route path="community-posts" element={<CommunityPostsPage />} />
             <Route path="complaints" element={<ComplaintsPage />} />
+            <Route path="complaints/:reportId" element={<ComplaintDetailPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="activity-logs" element={<ActivityLogsPage />} />
 
