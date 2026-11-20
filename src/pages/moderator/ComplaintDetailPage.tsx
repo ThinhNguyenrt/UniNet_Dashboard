@@ -62,7 +62,7 @@ export const ComplaintDetailPage: React.FC = () => {
   // Load report detail
   const loadDetail = useCallback(async () => {
     if (!reportId) {
-      setErrorMessage('Mã định danh báo cáo (reportId) không hợp lệ.');
+      setErrorMessage('Đường dẫn báo cáo không hợp lệ.');
       setIsLoading(false);
       return;
     }
@@ -75,9 +75,9 @@ export const ComplaintDetailPage: React.FC = () => {
     } catch (err: unknown) {
       const businessErr = communityReportService.extractBusinessError(err);
       if (businessErr.status === 404) {
-        setErrorMessage('Không tìm thấy báo cáo vi phạm yêu cầu (REPORT_NOT_FOUND). Báo cáo có thể đã bị xóa hoặc route chưa sẵn sàng.');
+        setErrorMessage('Không tìm thấy báo cáo vi phạm yêu cầu. Báo cáo có thể đã bị xóa hoặc chưa sẵn sàng.');
       } else if (businessErr.status === 403) {
-        setErrorMessage('Tài khoản không có quyền kiểm duyệt báo cáo vi phạm (community.review).');
+        setErrorMessage('Tài khoản không có quyền kiểm duyệt báo cáo vi phạm.');
       } else {
         setErrorMessage(businessErr.message || 'Không thể tải thông tin chi tiết báo cáo.');
       }
@@ -283,8 +283,8 @@ export const ComplaintDetailPage: React.FC = () => {
               <ShieldAlert className="w-7 h-7 text-blue-600" />
               Chi tiết báo cáo bài đăng
             </h1>
-            <p className="text-xs text-slate-500 mt-1 font-mono">
-              Mã báo cáo: {reportId}
+            <p className="text-xs text-slate-500 mt-1">
+              Kiểm tra nội dung vi phạm và đưa ra quyết định xử lý
             </p>
           </div>
 
@@ -392,9 +392,6 @@ export const ComplaintDetailPage: React.FC = () => {
                         <p className="text-xs font-bold text-slate-900">
                           {report.authorName?.trim() || 'Người dùng ẩn danh'}
                         </p>
-                        <p className="text-[10px] font-mono text-slate-400">
-                          Tác giả: {report.authorUserId}
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -457,10 +454,6 @@ export const ComplaintDetailPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-
-                <div className="pt-2 text-[10px] text-slate-400 font-mono">
-                  Mã bài đăng: {report.postId}
-                </div>
               </div>
             </div>
 
@@ -483,9 +476,6 @@ export const ComplaintDetailPage: React.FC = () => {
                   </span>
                   <p className="text-xs font-bold text-slate-900">
                     {report.reporterName?.trim() || 'Người dùng ẩn danh'}
-                  </p>
-                  <p className="text-[10px] font-mono text-slate-400">
-                    Mã user: {report.reporterUserId}
                   </p>
                 </div>
 
