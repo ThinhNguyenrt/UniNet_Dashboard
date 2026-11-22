@@ -1,9 +1,9 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { DashboardLayout } from './components/layout/DashboardLayout';
-import { roleDefaultRoutes } from './data/navigation';
+import { isPathAllowedForRole } from './data/navigation';
 
 // Pages
 import { LoginPage } from './pages/LoginPage';
@@ -44,6 +44,22 @@ import { AccountVerificationDetailPage } from './pages/admin/AccountVerification
 import { AccountantStatisticsPage } from './pages/accountant/AccountantStatisticsPage';
 import { AccountantWithdrawalsPage } from './pages/accountant/AccountantWithdrawalsPage';
 import { AccountantSettingsPage } from './pages/accountant/AccountantSettingsPage';
+import { getLastActivePath, setLastActivePath } from './utils/navigation-history';
+
+// Component tự động theo dõi và lưu lại route đang truy cập
+const LocationTracker: React.FC = () => {
+  const location = useLocation();
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    if (currentUser && isPathAllowedForRole(location.pathname, currentUser.role)) {
+      const fullPath = location.pathname + location.search + location.hash;
+      setLastActivePath(fullPath);
+    }
+  }, [location, currentUser]);
+
+  return null;
+};
 
 // Component điều hướng thông minh tại trang gốc "/"
 const RootRedirect: React.FC = () => {
@@ -64,13 +80,14 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return <Navigate to={roleDefaultRoutes[currentUser.role]} replace />;
+  return <Navigate to={getLastActivePath(currentUser.role)} replace />;
 };
 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <LocationTracker />
         <Routes>
           {/* Trang chủ & Xác thực */}
           <Route path="/" element={<RootRedirect />} />

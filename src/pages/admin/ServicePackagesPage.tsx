@@ -126,7 +126,7 @@ export const ServicePackagesPage: React.FC = () => {
         }
       } catch (err) {
         if (currentSeq === requestSeq.current) {
-          setErrorMessage(getApiErrorMessage(err, 'Không thể tải danh sách gói dịch vụ.'));
+          setErrorMessage(getApiErrorMessage(err, 'Không thể tải danh sách dịch vụ.'));
         }
       } finally {
         if (currentSeq === requestSeq.current) {
@@ -188,7 +188,7 @@ export const ServicePackagesPage: React.FC = () => {
     try {
       const updated = await packagesService.toggleStatus(pkg.id);
       showToastSuccess(
-        `Đã ${!pkg.isActive ? 'kích hoạt' : 'tắt'} thành công gói "${pkg.name}".`
+        `Đã ${!pkg.isActive ? 'kích hoạt' : 'tắt'} thành công dịch vụ "${pkg.name}".`
       );
       setSelectedPackageForDetail((prev) =>
         prev && prev.id === pkg.id
@@ -209,12 +209,12 @@ export const ServicePackagesPage: React.FC = () => {
     setIsDeactivatingId(packageToDelete.id);
     try {
       await packagesService.deactivate(packageToDelete.id);
-      showToastSuccess(`Đã ngừng cung cấp gói "${packageToDelete.name}".`);
+      showToastSuccess(`Đã ngừng cung cấp dịch vụ "${packageToDelete.name}".`);
       setPackageToDelete(null);
       setSelectedPackageForDetail(null);
       await fetchPackages(page);
     } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể ngừng cung cấp gói dịch vụ.'));
+      alert(getApiErrorMessage(err, 'Không thể ngừng cung cấp dịch vụ.'));
     } finally {
       setIsDeactivatingId(null);
     }
@@ -225,20 +225,20 @@ export const ServicePackagesPage: React.FC = () => {
     const errors: Record<string, string> = {};
 
     if (!formData.code.trim()) {
-      errors.code = 'Mã gói dịch vụ không được để trống.';
+      errors.code = 'Mã dịch vụ không được để trống.';
     } else if (formData.code.trim().length > 100) {
-      errors.code = 'Mã gói không được vượt quá 100 ký tự.';
+      errors.code = 'Mã dịch vụ không được vượt quá 100 ký tự.';
     }
 
     if (!formData.name.trim()) {
-      errors.name = 'Tên gói dịch vụ không được để trống.';
+      errors.name = 'Tên dịch vụ không được để trống.';
     } else if (formData.name.trim().length > 255) {
-      errors.name = 'Tên gói không được vượt quá 255 ký tự.';
+      errors.name = 'Tên dịch vụ không được vượt quá 255 ký tự.';
     }
 
     const priceTrimmed = formData.price.trim();
     if (!priceTrimmed) {
-      errors.price = 'Giá gói không được để trống.';
+      errors.price = 'Giá dịch vụ không được để trống.';
     } else if (!/^\d+(\.\d{1,2})?$/.test(priceTrimmed)) {
       errors.price = 'Mức giá phải là số dương hợp lệ (tối đa 2 chữ số thập phân).';
     } else {
@@ -286,18 +286,18 @@ export const ServicePackagesPage: React.FC = () => {
     try {
       if (editingPackage) {
         await packagesService.update(editingPackage.id, payload);
-        showToastSuccess(`Đã cập nhật gói "${payload.name}" thành công.`);
+        showToastSuccess(`Đã cập nhật dịch vụ "${payload.name}" thành công.`);
       } else {
         await packagesService.create(payload);
-        showToastSuccess(`Đã tạo mới gói "${payload.name}" thành công.`);
+        showToastSuccess(`Đã tạo mới dịch vụ "${payload.name}" thành công.`);
       }
       setIsCreateModalOpen(false);
       setEditingPackage(null);
       await fetchPackages(page);
     } catch (err: unknown) {
-      const msg = getApiErrorMessage(err, 'Không thể lưu thông tin gói dịch vụ.');
+      const msg = getApiErrorMessage(err, 'Không thể lưu thông tin dịch vụ.');
       if ((axios.isAxiosError(err) && err.response?.status === 409) || msg.includes('PACKAGE_CODE_EXISTS')) {
-        setFormErrors({ code: 'Mã gói dịch vụ này đã tồn tại trong hệ thống.' });
+        setFormErrors({ code: 'Mã dịch vụ này đã tồn tại trong hệ thống.' });
       } else {
         setFormErrors({ form: msg });
       }
@@ -347,7 +347,7 @@ export const ServicePackagesPage: React.FC = () => {
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-            Quản lý danh mục gói dịch vụ thẩm định dự án và quảng cáo dành cho Sinh viên và Doanh
+            Quản lý danh mục dịch vụ thẩm định dự án và quảng cáo dành cho Sinh viên và Doanh
             nghiệp trên hệ thống UniNet.
           </p>
         </div>
@@ -367,7 +367,7 @@ export const ServicePackagesPage: React.FC = () => {
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition"
           >
             <Plus className="w-4 h-4" />
-            Tạo gói mới
+            Tạo dịch vụ mới
           </button>
         </div>
       </div>
@@ -382,7 +382,7 @@ export const ServicePackagesPage: React.FC = () => {
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Tìm theo mã hoặc tên gói..."
+              placeholder="Tìm theo mã hoặc tên dịch vụ..."
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
             />
             {keyword && (
@@ -450,7 +450,7 @@ export const ServicePackagesPage: React.FC = () => {
         {isLoading ? (
           <div className="py-16 text-center text-slate-500">
             <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-xs font-medium">Đang tải danh sách gói dịch vụ...</p>
+            <p className="text-xs font-medium">Đang tải danh sách dịch vụ...</p>
           </div>
         ) : errorMessage ? (
           <div className="py-12 px-6 text-center space-y-3">
@@ -468,7 +468,7 @@ export const ServicePackagesPage: React.FC = () => {
         ) : packages.length === 0 ? (
           <div className="py-16 text-center text-slate-400 space-y-2">
             <Package className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-xs font-medium">Không tìm thấy gói dịch vụ nào phù hợp.</p>
+            <p className="text-xs font-medium">Không tìm thấy dịch vụ nào phù hợp.</p>
             {(keyword || typeFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all') && (
               <button
                 onClick={() => {
@@ -489,8 +489,8 @@ export const ServicePackagesPage: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-600 font-semibold">
-                  <th className="py-3 px-4">Mã gói</th>
-                  <th className="py-3 px-4">Tên gói</th>
+                  <th className="py-3 px-4">Mã dịch vụ</th>
+                  <th className="py-3 px-4">Tên dịch vụ</th>
                   <th className="py-3 px-4">Loại dịch vụ</th>
                   <th className="py-3 px-4">Đối tượng áp dụng</th>
                   <th className="py-3 px-4 text-right">Mức giá</th>
@@ -601,7 +601,7 @@ export const ServicePackagesPage: React.FC = () => {
         {!isLoading && totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-xs text-slate-600">
             <span>
-              Trang <strong>{page}</strong> / <strong>{totalPages}</strong> (Tổng cộng {totalItems} gói)
+              Trang <strong>{page}</strong> / <strong>{totalPages}</strong> (Tổng cộng {totalItems} dịch vụ)
             </span>
             <div className="flex items-center gap-1.5">
               <button
@@ -632,7 +632,7 @@ export const ServicePackagesPage: React.FC = () => {
                 <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
                   <Package className="w-4 h-4" />
                 </span>
-                <h2 className="text-sm font-bold text-slate-900">Chi tiết gói dịch vụ</h2>
+                <h2 className="text-sm font-bold text-slate-900">Chi tiết dịch vụ</h2>
               </div>
               <button
                 onClick={() => setSelectedPackageForDetail(null)}
@@ -660,7 +660,7 @@ export const ServicePackagesPage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 font-mono">
-                  Mã gói:{' '}
+                  Mã dịch vụ:{' '}
                   <span className="font-semibold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
                     {selectedPackageForDetail.code}
                   </span>
@@ -801,7 +801,7 @@ export const ServicePackagesPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="text-base font-bold text-slate-900">
-                {editingPackage ? 'Cập nhật thông tin gói dịch vụ' : 'Tạo gói dịch vụ mới'}
+                {editingPackage ? 'Cập nhật thông tin dịch vụ' : 'Tạo dịch vụ mới'}
               </h2>
               <button
                 onClick={() => {
@@ -825,7 +825,7 @@ export const ServicePackagesPage: React.FC = () => {
               {/* Code */}
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700 block">
-                  Mã gói dịch vụ <span className="text-red-500">*</span>
+                  Mã dịch vụ <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -842,13 +842,13 @@ export const ServicePackagesPage: React.FC = () => {
               {/* Name */}
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700 block">
-                  Tên gói dịch vụ <span className="text-red-500">*</span>
+                  Tên dịch vụ <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="VD: Gói thẩm định tiêu chuẩn sinh viên"
+                  placeholder="VD: Dịch vụ thẩm định tiêu chuẩn sinh viên"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                 />
                 {formErrors.name && (
@@ -942,7 +942,7 @@ export const ServicePackagesPage: React.FC = () => {
                     className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                   />
                   <span className="font-medium text-slate-800">
-                    Kích hoạt áp dụng gói này ngay sau khi lưu
+                    Kích hoạt áp dụng dịch vụ này ngay sau khi lưu
                   </span>
                 </label>
               </div>
@@ -970,7 +970,7 @@ export const ServicePackagesPage: React.FC = () => {
                   ) : (
                     <Check className="w-3.5 h-3.5" />
                   )}
-                  <span>{editingPackage ? 'Lưu thay đổi' : 'Tạo gói dịch vụ'}</span>
+                  <span>{editingPackage ? 'Lưu thay đổi' : 'Tạo dịch vụ'}</span>
                 </button>
               </div>
             </form>
@@ -988,13 +988,13 @@ export const ServicePackagesPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <h3 className="text-sm font-bold text-slate-900">
-                Xác nhận ngừng cung cấp gói dịch vụ?
+                Xác nhận ngừng cung cấp dịch vụ?
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Bạn đang chuẩn bị ngừng cung cấp gói{' '}
+                Bạn đang chuẩn bị ngừng cung cấp dịch vụ{' '}
                 <strong className="text-slate-900">"{packageToDelete.name}"</strong> (mã:{' '}
-                <code>{packageToDelete.code}</code>). Thao tác này sẽ vô hiệu hóa mềm gói dịch vụ (
-                <code>isActive = false</code>) và gói sẽ không còn xuất hiện cho người dùng đăng ký mới.
+                <code>{packageToDelete.code}</code>). Thao tác này sẽ vô hiệu hóa mềm dịch vụ (
+                <code>isActive = false</code>) và dịch vụ sẽ không còn xuất hiện cho người dùng đăng ký mới.
                 Lịch sử giao dịch trước đây vẫn được bảo toàn.
               </p>
             </div>
@@ -1019,7 +1019,7 @@ export const ServicePackagesPage: React.FC = () => {
                 ) : (
                   <Trash2 className="w-3.5 h-3.5" />
                 )}
-                <span>Ngừng cung cấp gói</span>
+                <span>Ngừng cung cấp dịch vụ</span>
               </button>
             </div>
           </div>
