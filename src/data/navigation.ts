@@ -245,6 +245,14 @@ export const roleNavigationConfig: Record<UserRole, NavigationItem[]> = {
       sectionIcon: CheckSquare,
     },
     {
+      id: 'moderator-advertisements',
+      label: 'Quảng cáo',
+      path: '/moderator/advertisements',
+      icon: Megaphone,
+      section: 'HỆ THỐNG',
+      sectionIcon: Settings,
+    },
+    {
       id: 'moderator-activity-logs',
       label: 'Nhật ký hoạt động',
       path: '/moderator/activity-logs',

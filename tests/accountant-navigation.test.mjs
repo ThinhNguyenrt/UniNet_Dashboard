@@ -126,11 +126,11 @@ test('admin sidebar has exactly the 18 items across 4 sections matching referenc
   assert.equal(serviceConfig.section, 'HỆ THỐNG');
 });
 
-test('moderator sidebar has exactly 4 items across 2 sections in order', () => {
+test('moderator sidebar has exactly 5 items across 2 sections in order', () => {
   const modNav = roleNavigationConfig.moderator;
-  assert.equal(modNav.length, 4, 'Moderator navigation must have exactly 4 items');
+  assert.equal(modNav.length, 5, 'Moderator navigation must have exactly 5 items');
 
-  const [projects, communityPosts, complaints, activityLogs] = modNav;
+  const [projects, communityPosts, complaints, ads, activityLogs] = modNav;
 
   // Section: KIỂM DUYỆT
   assert.equal(projects.label, 'Kiểm duyệt dự án');
@@ -146,6 +146,10 @@ test('moderator sidebar has exactly 4 items across 2 sections in order', () => {
   assert.equal(complaints.section, 'KIỂM DUYỆT');
 
   // Section: HỆ THỐNG
+  assert.equal(ads.label, 'Quảng cáo');
+  assert.equal(ads.path, '/moderator/advertisements');
+  assert.equal(ads.section, 'HỆ THỐNG');
+
   assert.equal(activityLogs.label, 'Nhật ký hoạt động');
   assert.equal(activityLogs.path, '/moderator/activity-logs');
   assert.equal(activityLogs.section, 'HỆ THỐNG');
@@ -191,6 +195,8 @@ test('role paths are correctly recognized and allowed', () => {
   assert.equal(isPathAllowedForRole('/admin/financial-settings', 'admin'), true);
   assert.equal(isPathAllowedForRole('/admin/complaints', 'admin'), true);
   assert.equal(isPathAllowedForRole('/admin/notification-broadcasts', 'admin'), true);
+  assert.equal(isPathAllowedForRole('/admin/advertisements', 'admin'), true);
+  assert.equal(isPathAllowedForRole('/moderator/advertisements', 'moderator'), true);
   assert.equal(isPathAllowedForRole('/admin/staff', 'accountant'), false);
   assert.equal(isPathAllowedForRole('/moderator/projects', 'accountant'), false);
   assert.equal(isPathAllowedForRole('/moderator/complaints', 'moderator'), true);
@@ -204,13 +210,17 @@ test('safeNotificationTarget allows valid routes for each role and disallows una
   assert.equal(safeNotificationTarget('/accountant/activity-logs', 'accountant'), '/accountant/activity-logs');
   assert.equal(safeNotificationTarget('/moderator/complaints', 'moderator'), '/moderator/complaints');
   assert.equal(safeNotificationTarget('/moderator/activity-logs', 'moderator'), '/moderator/activity-logs');
+  assert.equal(safeNotificationTarget('/moderator/advertisements', 'moderator'), '/moderator/advertisements');
   assert.equal(safeNotificationTarget('/verifier/activity-logs', 'verifier'), '/verifier/activity-logs');
   assert.equal(safeNotificationTarget('/admin/activity-logs', 'admin'), '/admin/activity-logs');
   assert.equal(safeNotificationTarget('/admin/complaints', 'admin'), '/admin/complaints');
   assert.equal(safeNotificationTarget('/admin/statistics', 'admin'), '/admin/statistics');
   assert.equal(safeNotificationTarget('/admin/withdrawals', 'admin'), '/admin/withdrawals');
   assert.equal(safeNotificationTarget('/admin/notification-broadcasts', 'admin'), '/admin/notification-broadcasts');
+  assert.equal(safeNotificationTarget('/admin/advertisements', 'admin'), '/admin/advertisements');
   assert.equal(safeNotificationTarget('/admin/staff', 'accountant'), null);
+  assert.equal(safeNotificationTarget('/admin/advertisements', 'accountant'), null);
+  assert.equal(safeNotificationTarget('/moderator/advertisements', 'accountant'), null);
 });
 
 test('financial monetary precision operates accurately beyond standard JS integer limit', () => {
