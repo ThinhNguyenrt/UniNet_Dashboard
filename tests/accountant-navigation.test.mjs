@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { roleNavigationConfig, roleDefaultRoutes, isPathAllowedForRole } from '../src/data/navigation.ts';
 import { safeNotificationTarget } from '../src/utils/notification-targets.ts';
 import { moneyText, refundableVnd } from '../src/utils/finance-money.ts';
+import { getLastActivePath, setLastActivePath, clearLastActivePath, LAST_ACTIVE_PATH_KEY } from '../src/utils/navigation-history.ts';
 
 test('accountant sidebar has exactly 4 items across 2 sections in order', () => {
   const accountantNav = roleNavigationConfig.accountant;
@@ -35,18 +36,16 @@ test('accountant sidebar has exactly 4 items across 2 sections in order', () => 
   assert.ok(!labels.includes('đối soát'));
 });
 
-test('admin sidebar has exactly the 17 items across 4 sections matching reference design in order', () => {
+test('admin sidebar has exactly the 18 items across 4 sections matching reference design in order', () => {
   const adminNav = roleNavigationConfig.admin;
-  assert.equal(adminNav.length, 17, 'Admin navigation must have exactly 17 items');
+  assert.equal(adminNav.length, 18, 'Admin navigation must have exactly 18 items');
 
   const [
     users, staff, students, partners,
-    projectVerifications, projectMod, communityPosts, complaints,
+    projectVerifications, assessorOnboardings, projectMod, communityPosts, complaints,
     statistics, withdrawals, finSettings,
     ads, notifications, activityLogs, skills, specializations, serviceConfig
   ] = adminNav;
-
-  // Section 1: QUẢN LÝ & XÁC MINH
 
   // Section 1: QUẢN LÝ & XÁC MINH
   assert.equal(users.label, 'Người dùng');
@@ -68,6 +67,10 @@ test('admin sidebar has exactly the 17 items across 4 sections matching referenc
   assert.equal(projectVerifications.label, 'Thẩm định dự án');
   assert.equal(projectVerifications.path, '/admin/project-verifications');
   assert.equal(projectVerifications.section, 'QUẢN LÝ & XÁC MINH');
+
+  assert.equal(assessorOnboardings.label, 'Hồ sơ assessor');
+  assert.equal(assessorOnboardings.path, '/admin/assessor-onboardings');
+  assert.equal(assessorOnboardings.section, 'QUẢN LÝ & XÁC MINH');
 
   // Section 2: KIỂM DUYỆT
 
@@ -218,4 +221,38 @@ test('financial monetary precision operates accurately beyond standard JS intege
   const reserved = '100000';
   const refundMax = refundableVnd('500000', reserved);
   assert.equal(refundMax, '400000');
+});
+
+test('navigation history remembers and restores valid active route across reload', () => {
+  const store = new Map();
+  globalThis.sessionStorage = {
+    getItem: (k) => store.get(k) || null,
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  };
+  globalThis.localStorage = globalThis.sessionStorage;
+
+  try {
+    // 1. Initially falls back to default role route
+    assert.equal(getLastActivePath('admin'), '/admin/users');
+
+    // 2. Set active path for admin
+    setLastActivePath('/admin/service-packages');
+    assert.equal(getLastActivePath('admin'), '/admin/service-packages');
+
+    // 3. Set active path with query params
+    setLastActivePath('/admin/assessor-onboardings?page=2&keyword=test');
+    assert.equal(getLastActivePath('admin'), '/admin/assessor-onboardings?page=2&keyword=test');
+
+    // 4. Role mismatch safety: if saved path is for admin, moderator falls back to moderator default
+    assert.equal(getLastActivePath('moderator'), '/moderator/projects');
+
+    // 5. Clear on logout
+    clearLastActivePath();
+    assert.equal(getLastActivePath('admin'), '/admin/users');
+  } finally {
+    delete globalThis.sessionStorage;
+    delete globalThis.localStorage;
+  }
 });

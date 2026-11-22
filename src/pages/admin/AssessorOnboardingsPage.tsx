@@ -29,6 +29,7 @@ import {
   ApprovalConflictError,
   ContractUnavailableError,
 } from '../../services/assessor-onboarding.service';
+import { formatAssessorOnboardingLink } from '../../utils/assessor-link';
 import { getApiErrorMessage } from '../../services/api';
 import {
   AssessorOnboardingStatus,
@@ -465,13 +466,14 @@ export const AssessorOnboardingsPage: React.FC = () => {
     setIsCopiedLink(false);
   };
 
-  const handleCopyLink = () => {
-    if (!createdInvitation) return;
-    const fullUrl = createdInvitation.profileLink.startsWith('http')
-      ? createdInvitation.profileLink
-      : `${window.location.origin}${createdInvitation.profileLink.startsWith('/') ? '' : '/'}${createdInvitation.profileLink}`;
+  const formattedOnboardingLink = createdInvitation
+    ? formatAssessorOnboardingLink(createdInvitation.profileLink)
+    : '';
 
-    navigator.clipboard.writeText(fullUrl);
+  const handleCopyLink = () => {
+    if (!formattedOnboardingLink) return;
+
+    navigator.clipboard.writeText(formattedOnboardingLink);
     setIsCopiedLink(true);
     setTimeout(() => setIsCopiedLink(false), 3000);
   };
@@ -1371,7 +1373,7 @@ export const AssessorOnboardingsPage: React.FC = () => {
                     <input
                       type="text"
                       readOnly
-                      value={createdInvitation.profileLink}
+                      value={formattedOnboardingLink}
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-[11px] font-mono text-slate-800 select-all"
                     />
                     <button

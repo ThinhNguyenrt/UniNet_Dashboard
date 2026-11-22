@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logoImg from '../assets/logo.jpg';
 import { useAuth } from '../context/AuthContext';
-import { getRedirectPathForRole } from '../data/navigation';
+import { isPathAllowedForRole } from '../data/navigation';
+import { getLastActivePath } from '../utils/navigation-history';
 
 export const LoginPage: React.FC = () => {
   const { login, isAuthenticated, currentUser } = useAuth();
@@ -16,11 +17,26 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Nếu đã đăng nhập thì tự động chuyển hướng về trang của vai trò tương ứng
+  // Trích xuất đường dẫn trước đó (nếu có) gồm cả search params
+  const extractFromPath = (state: unknown): string | null => {
+    const from = (state as { from?: { pathname?: string; search?: string; hash?: string } | string })?.from;
+    if (typeof from === 'string' && from.trim()) {
+      return from;
+    }
+    if (from && typeof from === 'object' && from.pathname) {
+      return `${from.pathname}${from.search || ''}${from.hash || ''}`;
+    }
+    return null;
+  };
+
+  // Nếu đã đăng nhập thì tự động chuyển hướng về trang của vai trò tương ứng hoặc trang trước khi reload
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-      const destination = getRedirectPathForRole(currentUser.role, from);
+      const fromPath = extractFromPath(location.state);
+      const destination =
+        fromPath && isPathAllowedForRole(fromPath.split('?')[0].split('#')[0], currentUser.role)
+          ? fromPath
+          : getLastActivePath(currentUser.role);
       navigate(destination, { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate, location]);
@@ -48,8 +64,11 @@ export const LoginPage: React.FC = () => {
         rememberMe,
       });
       if (res.success && res.user) {
-        const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-        const target = getRedirectPathForRole(res.user.role, from);
+        const fromPath = extractFromPath(location.state);
+        const target =
+          fromPath && isPathAllowedForRole(fromPath.split('?')[0].split('#')[0], res.user.role)
+            ? fromPath
+            : getLastActivePath(res.user.role);
         navigate(target, { replace: true });
       } else {
         setErrorMessage(res.error || 'Email hoặc mật khẩu không chính xác.');

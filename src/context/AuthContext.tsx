@@ -12,6 +12,7 @@ import { mockAccounts } from '../data/mockAccount';
 import { authService } from '../services/auth.service';
 import { getApiErrorMessage } from '../services/api';
 import { SESSION_EXPIRED_EVENT, SESSION_GENERATION_KEY, SESSION_REFRESHED_EVENT } from '../services/dashboard-session';
+import { clearLastActivePath } from '../utils/navigation-history';
 
 const AUTH_STORAGE_KEY = 'uninet_auth_user';
 
@@ -19,33 +20,49 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      return authService.getStoredUser();
+    } catch (e) {
+      console.error('Lỗi khi đọc phiên đăng nhập ban đầu:', e);
+      authService.clearAuthData();
+      return null;
+    }
+  });
+  const [isLoading] = useState(false);
 
-  // Khôi phục phiên làm việc từ localStorage khi F5 hoặc mở tab mới
+  // Khôi phục kiểm tra phiên làm việc từ localStorage khi F5 hoặc mở tab mới
   useEffect(() => {
     try {
       const user = authService.getStoredUser();
       if (user) {
         setCurrentUser(user);
+      } else if (currentUser) {
+        setCurrentUser(null);
       }
     } catch (e) {
       console.error('Lỗi khi đọc phiên đăng nhập:', e);
       authService.clearAuthData();
-    } finally {
-      setIsLoading(false);
+      setCurrentUser(null);
     }
   }, []);
 
   useEffect(() => {
-    const expired = () => { setCurrentUser(null); navigate('/login', { replace: true, state: {} }); };
+    const expired = () => {
+      clearLastActivePath();
+      setCurrentUser(null);
+      navigate('/login', { replace: true, state: {} });
+    };
     const refreshed = (event: Event) => {
       const response = (event as CustomEvent<LoginResponse>).detail;
       try {
         const user = authService.transformLoginResponseToUser(response);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
         setCurrentUser(user);
-      } catch { authService.clearAuthData(); expired(); }
+      } catch {
+        authService.clearAuthData();
+        expired();
+      }
     };
     const changed = (event: StorageEvent) => {
       if (event.key === SESSION_GENERATION_KEY || event.key === AUTH_STORAGE_KEY || event.key === null) {
@@ -142,6 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Đăng xuất: xóa token và phiên làm việc, chuyển hướng sạch về /login
    */
   const logout = () => {
+    clearLastActivePath();
     authService.clearAuthData();
     setCurrentUser(null);
     navigate('/login', { replace: true, state: {} });
