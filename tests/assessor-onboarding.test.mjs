@@ -44,39 +44,60 @@ test('ASSESSOR_ONBOARDING_STATUS_CONFIG provides user-friendly labels and descri
   assert.equal(ASSESSOR_ONBOARDING_STATUS_CONFIG[AssessorOnboardingStatus.Activated].label, 'Đã kích hoạt');
 });
 
-test('formatAssessorOnboardingLink strictly generates correct backend assess-onboarding URL format', () => {
+test('formatAssessorOnboardingLink strictly generates correct backend assessor-onboarding URL format without duplicates', () => {
   const token = 'c4ca4238a0b923820dcc509a6f75849b';
+  const expectedUrl = `https://uninet-be.onrender.com/assessor-onboarding/profile.html#token=${token}`;
 
-  // Relative path
+  // Actual backend response relative path
+  assert.equal(
+    formatAssessorOnboardingLink(`/assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+  assert.equal(
+    formatAssessorOnboardingLink(`assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+
+  // Absolute URL with origin (backend host or local dev server)
+  assert.equal(
+    formatAssessorOnboardingLink(`https://uninet-be.onrender.com/assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+  assert.equal(
+    formatAssessorOnboardingLink(`http://localhost:5000/assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+
+  // Eliminate duplicate / extra prefixes (assess-onboarding or assessor-boarding)
+  assert.equal(
+    formatAssessorOnboardingLink(`https://uninet-be.onrender.com/assess-onboarding/assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+  assert.equal(
+    formatAssessorOnboardingLink(`/assess-onboarding/assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+  assert.equal(
+    formatAssessorOnboardingLink(`/assessor-boarding/assessor-onboarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+
+  // Normalize assessor-boarding typo
+  assert.equal(
+    formatAssessorOnboardingLink(`/assessor-boarding/profile.html#token=${token}`),
+    expectedUrl
+  );
+
+  // Legacy assess-onboarding route normalized
   assert.equal(
     formatAssessorOnboardingLink(`/assess-onboarding/${token}`),
-    `https://uninet-be.onrender.com/assess-onboarding/${token}`
-  );
-  assert.equal(
-    formatAssessorOnboardingLink(`assess-onboarding/${token}`),
-    `https://uninet-be.onrender.com/assess-onboarding/${token}`
-  );
-
-  // Absolute URL with origin (e.g. backend host or local dev server)
-  assert.equal(
-    formatAssessorOnboardingLink(`https://uninet-be.onrender.com/assess-onboarding/${token}`),
-    `https://uninet-be.onrender.com/assess-onboarding/${token}`
-  );
-  assert.equal(
-    formatAssessorOnboardingLink(`http://localhost:5000/assess-onboarding/${token}`),
-    `https://uninet-be.onrender.com/assess-onboarding/${token}`
-  );
-
-  // Path with /api prefix
-  assert.equal(
-    formatAssessorOnboardingLink(`/api/assess-onboarding/${token}`),
-    `https://uninet-be.onrender.com/assess-onboarding/${token}`
+    expectedUrl
   );
 
   // Bare token
   assert.equal(
     formatAssessorOnboardingLink(token),
-    `https://uninet-be.onrender.com/assess-onboarding/${token}`
+    expectedUrl
   );
 });
 
