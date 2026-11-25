@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { apiClient } from './api';
+import { apiClient, getApiErrorMessage } from './api';
+import type { ApiErrorResponse } from '../types/auth';
 import type {
   AssessorInvitationResponse,
   AssessorOnboardingReviewResponse,
@@ -12,7 +13,7 @@ import type {
 export class ApprovalConflictError extends Error {
   conflictData: AssessorReviewResult;
   constructor(data: AssessorReviewResult) {
-    super(data.reviewReason || 'Email đã tồn tại tài khoản hoặc xung đột hồ sơ mở.');
+    super('Email đã được đăng ký. Hồ sơ chưa được phê duyệt.');
     this.name = 'ApprovalConflictError';
     this.conflictData = data;
   }
@@ -25,6 +26,128 @@ export class ContractUnavailableError extends Error {
     this.name = 'ContractUnavailableError';
     this.code = code;
   }
+}
+
+export type OnboardingActionErrorKind =
+  | 'invalid_reason'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'approval_conflict'
+  | 'onboarding_changed'
+  | 'contracts_disabled'
+  | 'timeout'
+  | 'generic';
+
+export interface ParsedOnboardingActionError {
+  kind: OnboardingActionErrorKind;
+  message: string;
+  conflictData?: AssessorReviewResult;
+}
+
+function extractValidationReasonError(errData: ApiErrorResponse | undefined): string | null {
+  if (!errData?.errors || typeof errData.errors !== 'object') return null;
+  for (const [key, messages] of Object.entries(errData.errors)) {
+    if (key.toLowerCase() === 'reason' && Array.isArray(messages) && messages.length > 0) {
+      return messages[0];
+    }
+  }
+  const allErrors = Object.values(errData.errors).flat();
+  return allErrors.length > 0 ? allErrors[0] : null;
+}
+
+export function parseOnboardingActionError(
+  err: unknown,
+  fallbackMessage = 'Không thể xử lý hồ sơ onboarding. Vui lòng thử lại.'
+): ParsedOnboardingActionError {
+  if (err instanceof ApprovalConflictError) {
+    return {
+      kind: 'approval_conflict',
+      message: 'Email đã được đăng ký. Hồ sơ chưa được phê duyệt.',
+      conflictData: err.conflictData,
+    };
+  }
+
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    const rawData = err.response?.data as (ApiErrorResponse & Partial<AssessorReviewResult>) | string | undefined;
+    const data = rawData && typeof rawData === 'object' ? rawData : undefined;
+    const code = data?.code || '';
+
+    if (err.code === 'ECONNABORTED' || err.message.toLowerCase().includes('timeout')) {
+      return {
+        kind: 'timeout',
+        message: 'Yêu cầu hết thời gian chờ (Timeout). Đang đọc lại trạng thái hồ sơ mới nhất trước khi thử lại.',
+      };
+    }
+
+    if (status === 400) {
+      const validationMsg = extractValidationReasonError(data);
+      return {
+        kind: 'invalid_reason',
+        message:
+          validationMsg ||
+          (code === 'INVALID_REASON' ? data?.message : undefined) ||
+          data?.message ||
+          data?.title ||
+          'Lý do từ chối không hợp lệ (cần từ 1 đến 2.000 ký tự).',
+      };
+    }
+
+    if (status === 401) {
+      return {
+        kind: 'unauthorized',
+        message: data?.message || 'Phiên làm việc không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',
+      };
+    }
+
+    if (status === 403 || code === 'FORBIDDEN') {
+      return {
+        kind: 'forbidden',
+        message: data?.message || 'Bạn không có quyền thực hiện thao tác này hoặc tài khoản Admin không còn hoạt động.',
+      };
+    }
+
+    if (status === 404 || code === 'ONBOARDING_NOT_FOUND') {
+      return {
+        kind: 'not_found',
+        message: data?.message || 'Hồ sơ onboarding không còn khả dụng.',
+      };
+    }
+
+    if (status === 409) {
+      if (
+        data?.status === 'ApprovalConflict' ||
+        data?.reviewReason === 'EMAIL_ALREADY_REGISTERED'
+      ) {
+        return {
+          kind: 'approval_conflict',
+          message: 'Email đã được đăng ký. Hồ sơ chưa được phê duyệt.',
+          conflictData: data as AssessorReviewResult,
+        };
+      }
+      return {
+        kind: 'onboarding_changed',
+        message:
+          data?.message ||
+          'Hồ sơ vừa thay đổi trạng thái hoặc không ở trạng thái hợp lệ để thực hiện thao tác này.',
+      };
+    }
+
+    if (status === 503 || code === 'CONTRACTS_DISABLED') {
+      return {
+        kind: 'contracts_disabled',
+        message:
+          data?.message ||
+          'Tính năng onboarding thẩm định viên chưa được cấu hình trên môi trường đang gọi.',
+      };
+    }
+  }
+
+  return {
+    kind: 'generic',
+    message: getApiErrorMessage(err, fallbackMessage),
+  };
 }
 
 export const assessorOnboardingService = {
@@ -133,8 +256,7 @@ export const assessorOnboardingService = {
   async approve(id: string): Promise<AssessorReviewResult> {
     try {
       const response = await apiClient.post<AssessorReviewResult>(
-        `/admin/assessor-onboardings/${id}/approve`,
-        {}
+        `/admin/assessor-onboardings/${id}/approve`
       );
       return response.data;
     } catch (err: unknown) {
