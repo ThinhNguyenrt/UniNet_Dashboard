@@ -50,14 +50,14 @@ export const ASSESSOR_ONBOARDING_STATUS_CONFIG: Record<
     bg: 'bg-rose-50',
     text: 'text-rose-700',
     border: 'border-rose-200',
-    desc: 'Email đã tồn tại tài khoản hoặc hồ sơ khác. Cần từ chối hoặc xử lý hồ sơ cũ trước.',
+    desc: 'Email đã được đăng ký tài khoản hoặc có xung đột hồ sơ mở khác. Không thể phê duyệt; cần từ chối hồ sơ hoặc xử lý tài khoản trùng trước.',
   },
   [AssessorOnboardingStatus.AwaitingPassword]: {
-    label: 'Chờ đặt mật khẩu',
+    label: 'Chờ thiết lập mật khẩu',
     bg: 'bg-cyan-50',
     text: 'text-cyan-700',
     border: 'border-cyan-200',
-    desc: 'Đã phê duyệt và cấp tài khoản. Đang chờ chuyên gia hoàn tất kích hoạt mật khẩu.',
+    desc: 'Đã phê duyệt và cấp tài khoản. Đang chờ chuyên gia hoàn tất thiết lập mật khẩu để kích hoạt.',
   },
   [AssessorOnboardingStatus.Activated]: {
     label: 'Đã kích hoạt',
@@ -199,4 +199,37 @@ export interface SessionOnboardingItem {
   fullName: string | null;
   status: string;
   updatedAt: string;
+}
+
+export function getMissingApproveRequirements(
+  detail: AssessorOnboardingReviewResponse | null | undefined
+): string[] {
+  if (!detail) return [];
+  const missing: string[] = [];
+  if (!detail.fullName?.trim()) missing.push('họ và tên (fullName)');
+  if (!detail.signedName?.trim()) missing.push('tên chữ ký (signedName)');
+  if (!detail.signedAt) missing.push('thời điểm ký (signedAt)');
+  if (!detail.emailConfirmedAt) missing.push('xác thực email (emailConfirmedAt)');
+  if (!detail.contractSha256?.trim()) missing.push('mã băm hợp đồng (contractSha256)');
+  return missing;
+}
+
+export function canEnableAssessorApprove(
+  detail: AssessorOnboardingReviewResponse | null | undefined
+): boolean {
+  if (!detail || detail.status !== AssessorOnboardingStatus.AwaitingApproval) {
+    return false;
+  }
+  return getMissingApproveRequirements(detail).length === 0;
+}
+
+export function formatOnboardingDateTime(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  }).format(date);
 }

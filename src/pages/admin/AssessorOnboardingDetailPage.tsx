@@ -1,292 +1,93 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-  UserCheck,
   ArrowLeft,
   RotateCcw,
-  FileText,
   CheckCircle2,
-  XCircle,
-  Send,
-  KeyRound,
-  Trash2,
-  Shield,
-  FileSignature,
   AlertCircle,
   X,
-  Check,
-  Info,
   Loader2,
 } from 'lucide-react';
-import {
-  assessorOnboardingService,
-  ApprovalConflictError,
-  ContractUnavailableError,
-} from '../../services/assessor-onboarding.service';
+import { useAuth } from '../../context/AuthContext';
+import { assessorOnboardingService } from '../../services/assessor-onboarding.service';
 import { getApiErrorMessage } from '../../services/api';
-import {
-  AssessorOnboardingStatus,
-  getAssessorOnboardingStatusConfig,
-} from '../../types/assessor-onboarding';
+import { getAssessorOnboardingStatusConfig } from '../../types/assessor-onboarding';
 import type { AssessorOnboardingReviewResponse } from '../../types/assessor-onboarding';
+import { AssessorOnboardingDetailView } from '../../components/admin/AssessorOnboardingDetailView';
 
 export const AssessorOnboardingDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
 
   // Data states
   const [detail, setDetail] = useState<AssessorOnboardingReviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Mutation loading & cooldown states
-  const [isApproving, setIsApproving] = useState(false);
-  const [isRevoking, setIsRevoking] = useState(false);
-  const [isResendingContract, setIsResendingContract] = useState(false);
-  const [isResendingPassword, setIsResendingPassword] = useState(false);
-  const [contractCooldown, setContractCooldown] = useState(0);
-  const [passwordCooldown, setPasswordCooldown] = useState(0);
-
-  // Modals
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectError, setRejectError] = useState<string | null>(null);
-  const [isSubmittingReject, setIsSubmittingReject] = useState(false);
-
-  const [isRevokeConfirmOpen, setIsRevokeConfirmOpen] = useState(false);
-  const [isApproveConfirmOpen, setIsApproveConfirmOpen] = useState(false);
-
-  // PDF Viewer Modal
-  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-
-  // Timer reference for cooldown countdowns
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    if (contractCooldown > 0) {
-      timer = setTimeout(() => setContractCooldown((c) => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [contractCooldown]);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    if (passwordCooldown > 0) {
-      timer = setTimeout(() => setPasswordCooldown((c) => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [passwordCooldown]);
-
-  // Clean up PDF blob url
   useEffect(() => {
     return () => {
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
-  }, [pdfBlobUrl]);
+  }, []);
 
   // Fetch detail
   const fetchDetail = useCallback(
-    async (showLoadingSpinner = true) => {
-      if (!id) return;
+    async (showLoadingSpinner = true, signal?: AbortSignal): Promise<AssessorOnboardingReviewResponse | null> => {
+      if (!id) return null;
       if (showLoadingSpinner) setIsLoading(true);
       setErrorMessage(null);
 
       try {
-        const res = await assessorOnboardingService.getDetail(id);
-        setDetail(res);
+        const res = await assessorOnboardingService.getDetail(id, signal);
+        if (!signal?.aborted) {
+          setDetail(res);
+          return res;
+        }
+        return null;
       } catch (err: unknown) {
+        if (signal?.aborted) return null;
         if (axios.isAxiosError(err)) {
           const status = err.response?.status;
           const data = err.response?.data as { code?: string; message?: string } | undefined;
           if (status === 404 || data?.code === 'ONBOARDING_NOT_FOUND') {
-            setErrorMessage('Hồ sơ onboarding không còn tồn tại trên hệ thống.');
-          } else if (status === 403) {
-            setErrorMessage('Bạn không có quyền xem chi tiết hồ sơ này.');
+            setErrorMessage('Hồ sơ onboarding không còn khả dụng hoặc không tồn tại trên hệ thống.');
+          } else if (status === 401) {
+            setErrorMessage('Phiên làm việc không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.');
+          } else if (status === 403 || data?.code === 'FORBIDDEN') {
+            setErrorMessage(data?.message || 'Bạn không có quyền xem chi tiết hồ sơ này.');
           } else {
             setErrorMessage(getApiErrorMessage(err, 'Không thể tải chi tiết hồ sơ onboarding.'));
           }
         } else {
           setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
         }
+        return null;
       } finally {
-        if (showLoadingSpinner) setIsLoading(false);
+        if (showLoadingSpinner && !signal?.aborted) {
+          setIsLoading(false);
+        }
       }
     },
     [id]
   );
 
   useEffect(() => {
+    const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchDetail(true);
+    void fetchDetail(true, controller.signal);
+    return () => controller.abort();
   }, [fetchDetail]);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setActionSuccessMessage(msg);
-    setTimeout(() => setActionSuccessMessage(null), 4000);
-  };
-
-  // View Contract PDF
-  const handleOpenContractPdf = async () => {
-    if (!id) return;
-    setIsPdfModalOpen(true);
-    setIsLoadingPdf(true);
-    setPdfError(null);
-
-    if (pdfBlobUrl) {
-      URL.revokeObjectURL(pdfBlobUrl);
-      setPdfBlobUrl(null);
-    }
-
-    try {
-      const blob = await assessorOnboardingService.getContractPdf(id);
-      const url = URL.createObjectURL(blob);
-      setPdfBlobUrl(url);
-    } catch (err) {
-      if (err instanceof ContractUnavailableError) {
-        setPdfError('Chưa có hợp đồng nào được tạo cho hồ sơ này.');
-      } else {
-        setPdfError(getApiErrorMessage(err, 'Không thể tải bản thảo hợp đồng PDF.'));
-      }
-    } finally {
-      setIsLoadingPdf(false);
-    }
-  };
-
-  const handleClosePdfModal = () => {
-    setIsPdfModalOpen(false);
-    if (pdfBlobUrl) {
-      URL.revokeObjectURL(pdfBlobUrl);
-      setPdfBlobUrl(null);
-    }
-    setPdfError(null);
-  };
-
-  // Approve action
-  const handleApprove = async () => {
-    if (!id || isApproving) return;
-    setIsApproving(true);
-    setIsApproveConfirmOpen(false);
-
-    try {
-      await assessorOnboardingService.approve(id);
-      showToast('Đã phê duyệt hồ sơ thành công! Hệ thống đã cấp tài khoản thẩm định viên.');
-      await fetchDetail(false);
-    } catch (err) {
-      if (err instanceof ApprovalConflictError) {
-        alert(
-          `Xung đột phê duyệt: Email này đã được sử dụng hoặc có xung đột hồ sơ (${err.message}). Trạng thái đã chuyển sang Xung đột phê duyệt.`
-        );
-        await fetchDetail(false);
-      } else {
-        alert(getApiErrorMessage(err, 'Không thể phê duyệt hồ sơ onboarding.'));
-      }
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  // Reject action
-  const handleReject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || isSubmittingReject) return;
-    const cleanReason = rejectReason.trim();
-
-    if (!cleanReason) {
-      setRejectError('Vui lòng nhập lý do từ chối hồ sơ.');
-      return;
-    }
-    if (cleanReason.length > 2000) {
-      setRejectError('Lý do từ chối không được vượt quá 2000 ký tự.');
-      return;
-    }
-
-    setIsSubmittingReject(true);
-    setRejectError(null);
-
-    try {
-      await assessorOnboardingService.reject(id, cleanReason);
-      showToast('Đã từ chối hồ sơ onboarding và gửi thông báo qua email.');
-      setIsRejectModalOpen(false);
-      setRejectReason('');
-      await fetchDetail(false);
-    } catch (err) {
-      setRejectError(getApiErrorMessage(err, 'Không thể từ chối hồ sơ onboarding.'));
-    } finally {
-      setIsSubmittingReject(false);
-    }
-  };
-
-  // Revoke action
-  const handleRevoke = async () => {
-    if (!id || isRevoking) return;
-    setIsRevoking(true);
-    setIsRevokeConfirmOpen(false);
-
-    try {
-      await assessorOnboardingService.revoke(id);
-      showToast('Đã thu hồi lời mời onboarding thành công.');
-      await fetchDetail(false);
-    } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể thu hồi hồ sơ onboarding.'));
-    } finally {
-      setIsRevoking(false);
-    }
-  };
-
-  // Resend Contract action
-  const handleResendContract = async () => {
-    if (!id || isResendingContract || contractCooldown > 0) return;
-    setIsResendingContract(true);
-
-    try {
-      await assessorOnboardingService.resendContract(id);
-      showToast('Đã gửi lại liên kết ký hợp đồng cho chuyên gia thẩm định.');
-      setContractCooldown(60);
-    } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể gửi lại liên kết hợp đồng.'));
-    } finally {
-      setIsResendingContract(false);
-    }
-  };
-
-  // Resend Password action
-  const handleResendPassword = async () => {
-    if (!id || isResendingPassword || passwordCooldown > 0) return;
-    setIsResendingPassword(true);
-
-    try {
-      await assessorOnboardingService.resendPassword(id);
-      showToast('Đã gửi lại liên kết thiết lập mật khẩu cho chuyên gia.');
-      setPasswordCooldown(60);
-    } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể gửi lại liên kết mật khẩu.'));
-    } finally {
-      setIsResendingPassword(false);
-    }
-  };
-
-  // Format date helper in Asia/Ho_Chi_Minh (UTC+7)
-  const formatDateTime = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    try {
-      return new Date(dateStr).toLocaleString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        timeZone: 'Asia/Ho_Chi_Minh',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setActionSuccessMessage(null), 4000);
+  }, []);
 
   if (isLoading) {
     return (
@@ -309,13 +110,15 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
+            type="button"
             onClick={() => navigate('/admin/assessor-onboardings')}
             className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
           >
             Quay lại danh sách hồ sơ
           </button>
           <button
-            onClick={() => fetchDetail(true)}
+            type="button"
+            onClick={() => void fetchDetail(true)}
             className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition"
           >
             Thử lại
@@ -327,34 +130,6 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
 
   const statusConfig = getAssessorOnboardingStatusConfig(detail.status);
 
-  // Action permissions based on status
-  const canRevoke = (
-    [
-      AssessorOnboardingStatus.Invited,
-      AssessorOnboardingStatus.ProfileSubmitted,
-      AssessorOnboardingStatus.AwaitingSignature,
-      AssessorOnboardingStatus.AwaitingApproval,
-    ] as string[]
-  ).includes(detail.status);
-
-  const canApprove = detail.status === AssessorOnboardingStatus.AwaitingApproval;
-  const canReject =
-    detail.status === AssessorOnboardingStatus.AwaitingApproval ||
-    detail.status === AssessorOnboardingStatus.ApprovalConflict;
-
-  const canResendContract = detail.status === AssessorOnboardingStatus.AwaitingSignature;
-  const canResendPassword = detail.status === AssessorOnboardingStatus.AwaitingPassword;
-
-  const canViewContract = (
-    [
-      AssessorOnboardingStatus.AwaitingSignature,
-      AssessorOnboardingStatus.AwaitingApproval,
-      AssessorOnboardingStatus.ApprovalConflict,
-      AssessorOnboardingStatus.AwaitingPassword,
-      AssessorOnboardingStatus.Activated,
-    ] as string[]
-  ).includes(detail.status);
-
   return (
     <div className="space-y-6 animate-fade-in p-6 max-w-7xl mx-auto">
       {/* Toast Alert */}
@@ -363,6 +138,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span className="text-xs font-semibold">{actionSuccessMessage}</span>
           <button
+            type="button"
             onClick={() => setActionSuccessMessage(null)}
             className="ml-2 text-emerald-600 hover:text-emerald-800"
           >
@@ -374,6 +150,7 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
       {/* Top Breadcrumb & Refresh */}
       <div className="flex items-center justify-between gap-4">
         <button
+          type="button"
           onClick={() => navigate('/admin/assessor-onboardings')}
           className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs"
         >
@@ -382,7 +159,8 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => fetchDetail(false)}
+          type="button"
+          onClick={() => void fetchDetail(false)}
           className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs transition flex items-center gap-1.5"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -391,472 +169,41 @@ export const AssessorOnboardingDetailPage: React.FC = () => {
       </div>
 
       {/* Main Header Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-slate-700">
-                Hồ sơ assessor
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
+        <div className="space-y-1.5 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-slate-700">
+              Hồ sơ assessor
+            </span>
+            <span
+              className={`text-xs font-bold px-3 py-0.5 rounded-full border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+            >
+              {statusConfig.label}
+            </span>
+            {detail.autoApprove && (
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                Tự động duyệt: Bật
               </span>
-              <span
-                className={`text-xs font-bold px-3 py-0.5 rounded-full border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
-              >
-                {statusConfig.label}
-              </span>
-              {detail.autoApprove && (
-                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  Tự động duyệt: Bật
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              {detail.fullName || detail.emailNormalized}
-            </h1>
-            <p className="text-xs text-slate-500">
-              Email: <span className="font-semibold text-slate-700">{detail.emailNormalized}</span>
-            </p>
+            )}
           </div>
 
-          {/* Action Buttons Matrix */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {canViewContract && (
-              <button
-                type="button"
-                onClick={handleOpenContractPdf}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs transition flex items-center gap-1.5"
-              >
-                <FileText className="w-4 h-4 text-blue-600" />
-                <span>Xem hợp đồng PDF</span>
-              </button>
-            )}
-
-            {canResendContract && (
-              <button
-                type="button"
-                onClick={handleResendContract}
-                disabled={isResendingContract || contractCooldown > 0}
-                className="px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>
-                  {contractCooldown > 0
-                    ? `Gửi lại hợp đồng (${contractCooldown}s)`
-                    : 'Gửi lại link ký hợp đồng'}
-                </span>
-              </button>
-            )}
-
-            {canResendPassword && (
-              <button
-                type="button"
-                onClick={handleResendPassword}
-                disabled={isResendingPassword || passwordCooldown > 0}
-                className="px-3.5 py-2 text-xs font-semibold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>
-                  {passwordCooldown > 0
-                    ? `Gửi lại link mật khẩu (${passwordCooldown}s)`
-                    : 'Gửi lại link đặt mật khẩu'}
-                </span>
-              </button>
-            )}
-
-            {canApprove && (
-              <button
-                type="button"
-                onClick={() => setIsApproveConfirmOpen(true)}
-                disabled={isApproving}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Phê duyệt hồ sơ</span>
-              </button>
-            )}
-
-            {canReject && (
-              <button
-                type="button"
-                onClick={() => {
-                  setRejectReason('');
-                  setRejectError(null);
-                  setIsRejectModalOpen(true);
-                }}
-                className="px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl shadow-xs transition flex items-center gap-1.5"
-              >
-                <XCircle className="w-4 h-4" />
-                <span>Từ chối hồ sơ</span>
-              </button>
-            )}
-
-            {canRevoke && (
-              <button
-                type="button"
-                onClick={() => setIsRevokeConfirmOpen(true)}
-                disabled={isRevoking}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-xl transition flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Thu hồi</span>
-              </button>
-            )}
-          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            {detail.fullName || detail.emailNormalized}
+          </h1>
+          <p className="text-xs text-slate-500">
+            Email: <span className="font-semibold text-slate-700">{detail.emailNormalized}</span>
+          </p>
         </div>
 
-        {/* Status helper callout */}
-        <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${statusConfig.bg} ${statusConfig.border}`}>
-          <Info className={`w-4 h-4 shrink-0 mt-0.5 ${statusConfig.text}`} />
-          <div className="space-y-0.5">
-            <span className={`font-bold ${statusConfig.text}`}>{statusConfig.label}</span>
-            <p className="text-slate-600 text-[11px] leading-relaxed">{statusConfig.desc}</p>
-          </div>
-        </div>
+        <AssessorOnboardingDetailView
+          detail={detail}
+          isAdmin={isAdmin}
+          variant="page"
+          onRefreshDetail={() => fetchDetail(false)}
+          onNotFound={(msg) => setErrorMessage(msg)}
+          onToast={showToast}
+        />
       </div>
-
-      {/* Detail Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card 1: Thông tin hồ sơ */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <UserCheck className="w-4 h-4 text-blue-600" />
-            Thông tin hồ sơ
-          </h2>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Họ và tên chuyên gia:</span>
-              <span className="font-semibold text-slate-900">
-                {detail.fullName || <span className="text-slate-400 font-normal">Chưa cung cấp</span>}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Địa chỉ Email:</span>
-              <span className="font-semibold text-slate-800">{detail.emailNormalized}</span>
-            </div>
-
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Trạng thái hồ sơ:</span>
-              <span className="font-semibold text-slate-800">{statusConfig.label}</span>
-            </div>
-
-            <div className="flex justify-between py-1.5">
-              <span className="text-slate-500">Kích hoạt tài khoản:</span>
-              <span className="font-medium">
-                {detail.activatedAt ? (
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    Đã kích hoạt lúc {formatDateTime(detail.activatedAt)}
-                  </span>
-                ) : (
-                  <span className="text-slate-400">Chưa kích hoạt</span>
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Bằng chứng hợp đồng điện tử */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <FileSignature className="w-4 h-4 text-indigo-600" />
-            Ký hợp đồng điện tử
-          </h2>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Họ tên chữ ký số:</span>
-              <span className="font-semibold text-slate-900">
-                {detail.signedName || <span className="text-slate-400 font-normal">Chưa ký</span>}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Thời điểm ký kết:</span>
-              <span className="font-medium text-slate-800">
-                {formatDateTime(detail.signedAt)}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Xác thực OTP Email:</span>
-              <span className="font-medium">
-                {detail.emailConfirmedAt ? (
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    Đã xác thực lúc {formatDateTime(detail.emailConfirmedAt)}
-                  </span>
-                ) : (
-                  <span className="text-slate-400">Chưa xác thực</span>
-                )}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1.5 border-b border-slate-50">
-              <span className="text-slate-500">Thời điểm mở xem hợp đồng:</span>
-              <span className="font-medium text-slate-800">
-                {formatDateTime(detail.contractViewedAt)}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1.5">
-              <span className="text-slate-500">Phiên bản hợp đồng:</span>
-              <span className="font-medium text-slate-800">
-                {detail.templateVersion || '—'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Thông tin phê duyệt */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4 lg:col-span-2">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Shield className="w-4 h-4 text-purple-600" />
-            Phê duyệt & Xét duyệt
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <span className="text-slate-500 block">Phương thức phê duyệt:</span>
-              <span className="font-semibold text-slate-800">
-                {detail.autoApprove ? 'Tự động duyệt qua hệ thống' : 'Quản trị viên phê duyệt thủ công'}
-              </span>
-              {detail.autoApproveAt && (
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Lịch tự duyệt dự kiến: {formatDateTime(detail.autoApproveAt)}
-                </p>
-              )}
-            </div>
-
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <span className="text-slate-500 block">Thời điểm xét duyệt:</span>
-              <span className="font-semibold text-slate-800">
-                {formatDateTime(detail.reviewedAt)}
-              </span>
-            </div>
-
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 sm:col-span-2 lg:col-span-1">
-              <span className="text-slate-500 block">Ghi chú / Lý do xét duyệt:</span>
-              <span className="font-medium text-slate-800 block">
-                {detail.reviewReason || (
-                  <span className="text-slate-400 italic">Không có ghi chú thêm</span>
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal: PDF Viewer */}
-      {isPdfModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-900">
-                  Bản hợp đồng điện tử — {detail.fullName || detail.emailNormalized}
-                </h3>
-              </div>
-              <button
-                onClick={handleClosePdfModal}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
-              {isLoadingPdf ? (
-                <div className="text-center text-slate-500 space-y-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
-                  <p className="text-xs font-medium">Đang tải bản hợp đồng PDF...</p>
-                </div>
-              ) : pdfError ? (
-                <div className="p-6 text-center space-y-3 bg-white rounded-2xl border border-red-200 max-w-md shadow-sm">
-                  <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
-                  <h4 className="text-sm font-bold text-slate-900">Không thể xem hợp đồng</h4>
-                  <p className="text-xs text-slate-600">{pdfError}</p>
-                  <button
-                    onClick={handleOpenContractPdf}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition"
-                  >
-                    Thử tải lại
-                  </button>
-                </div>
-              ) : pdfBlobUrl ? (
-                <iframe
-                  src={pdfBlobUrl}
-                  title="Bản hợp đồng PDF"
-                  className="w-full h-full border-none"
-                />
-              ) : null}
-            </div>
-
-            <div className="px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-500">
-              <span>Hợp đồng được ký điện tử và lưu trữ bảo mật trên hệ thống UniNet.</span>
-              <button
-                onClick={handleClosePdfModal}
-                className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 font-semibold text-slate-700 rounded-xl transition"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Confirm Approve */}
-      {isApproveConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-slate-900">
-                Xác nhận phê duyệt hồ sơ chuyên gia?
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Hồ sơ đã được ký tên và xác thực email. Phê duyệt sẽ cấp tài khoản thẩm định viên và gửi liên kết đặt mật khẩu cho chuyên gia{' '}
-                <strong className="text-slate-900">{detail.fullName || detail.emailNormalized}</strong>.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsApproveConfirmOpen(false)}
-                disabled={isApproving}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleApprove}
-                disabled={isApproving}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isApproving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isApproving ? 'Đang phê duyệt...' : 'Xác nhận phê duyệt'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Reject with Reason */}
-      {isRejectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-600" />
-                Từ chối hồ sơ Onboarding
-              </h3>
-              <button
-                onClick={() => setIsRejectModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleReject} className="space-y-4 text-xs">
-              {rejectError && (
-                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{rejectError}</span>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 block">
-                  Lý do từ chối hồ sơ <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Nhập lý do chi tiết từ chối hồ sơ..."
-                  rows={4}
-                  maxLength={2000}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
-                />
-                <div className="flex justify-between text-[11px] text-slate-400">
-                  <span>Lý do này sẽ được gửi thông báo đến email chuyên gia.</span>
-                  <span>{rejectReason.length}/2000</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsRejectModalOpen(false)}
-                  disabled={isSubmittingReject}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-xl transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingReject || !rejectReason.trim()}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {isSubmittingReject && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isSubmittingReject ? 'Đang gửi...' : 'Xác nhận từ chối'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Confirm Revoke */}
-      {isRevokeConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="w-10 h-10 bg-red-50 text-red-600 rounded-full flex items-center justify-center">
-              <Trash2 className="w-5 h-5" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-slate-900">
-                Thu hồi lời mời Onboarding?
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Hành động này sẽ hủy bỏ hiệu lực của lời mời/hồ sơ của chuyên gia{' '}
-                <strong className="text-slate-900">
-                  {detail.fullName || detail.emailNormalized}
-                </strong>
-                . Đường dẫn khai báo hoặc ký hợp đồng sẽ không còn sử dụng được.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsRevokeConfirmOpen(false)}
-                disabled={isRevoking}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleRevoke}
-                disabled={isRevoking}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isRevoking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isRevoking ? 'Đang thu hồi...' : 'Xác nhận thu hồi'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
