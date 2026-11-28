@@ -20,6 +20,9 @@ export const moderationCheckResultLabels: Record<ModerationCheckResult, string> 
 };
 
 export const getModerationCheckResultLabel = (result: unknown): string => {
+  if (result === null || result === undefined) {
+    return 'Chưa có';
+  }
   if (typeof result === 'number' && result in moderationCheckResultLabels) {
     return moderationCheckResultLabels[result as ModerationCheckResult];
   }
@@ -65,10 +68,33 @@ export const projectModerationStatusLabels: Record<ProjectModerationStatus, stri
   [ProjectModerationStatus.NeedsEvidence]: 'Cần minh chứng',
 };
 
+export const ProjectHubStatus = {
+  Pending: 0,
+  Active: 1,
+  Completed: 2,
+  Rejected: 3,
+} as const;
+export type ProjectHubStatus =
+  (typeof ProjectHubStatus)[keyof typeof ProjectHubStatus];
+
+export const projectHubStatusLabels: Record<ProjectHubStatus, string> = {
+  [ProjectHubStatus.Pending]: 'Chờ duyệt',
+  [ProjectHubStatus.Active]: 'Đang hoạt động',
+  [ProjectHubStatus.Completed]: 'Đã hoàn thành',
+  [ProjectHubStatus.Rejected]: 'Đã từ chối',
+};
+
+export const getProjectHubStatusLabel = (status: unknown): string => {
+  if (typeof status === 'number' && status in projectHubStatusLabels) {
+    return projectHubStatusLabels[status as ProjectHubStatus];
+  }
+  return 'Chưa rõ';
+};
+
 export interface CreatorInfo {
   id: string;
   fullName: string;
-  nickname: string;
+  nickname?: string | null;
   avatarUrl?: string | null;
 }
 
@@ -92,6 +118,7 @@ export interface ProjectDetail {
   title: string;
   projectField?: string | null;
   description?: string | null;
+  status?: ProjectHubStatus | number | null;
   memberTarget?: number | null;
   minimumQuantity?: number | null;
   currentMemberCount?: number;
@@ -106,8 +133,8 @@ export interface ProjectModerationRecord {
   id: string;
   attemptNumber: number;
   status: ProjectModerationStatus;
-  contentResult: ModerationCheckResult;
-  linkResult: ModerationCheckResult;
+  contentResult?: ModerationCheckResult | null;
+  linkResult?: ModerationCheckResult | null;
   confidence?: number | null;
   violationReason?: string | null;
   checkedAt?: string | null;
@@ -131,6 +158,13 @@ export interface PendingProjectModerationsResponse {
 
 export interface ReviewProjectRequest {
   reviewNote?: string | null;
+}
+
+export interface ProjectModerationApiError {
+  status?: number;
+  code?: string;
+  message: string;
+  isNetworkOrTimeout?: boolean;
 }
 
 /**
