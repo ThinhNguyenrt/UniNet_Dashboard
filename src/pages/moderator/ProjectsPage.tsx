@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
 import {
   FolderKanban,
   RotateCcw,
@@ -19,7 +18,6 @@ import {
   AlertCircle,
   ShieldCheck,
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
 import { useAdminManagement } from '../../context/admin-management-context';
 import { projectModerationService } from '../../services/project-moderation.service';
 import type {
@@ -28,13 +26,14 @@ import type {
 } from '../../types/project-moderation';
 import {
   ModerationCheckResult,
+  ProjectHubStatus,
   getModerationCheckResultLabel,
   getModerationCheckResultBadgeClass,
+  getProjectHubStatusLabel,
   sanitizeDisplayText,
 } from '../../types/project-moderation';
 
 export const ModeratorProjectsPage: React.FC = () => {
-  const { currentUser } = useAuth();
   const access = useAdminManagement();
 
   // Danh sách dữ liệu & Phân trang
@@ -45,6 +44,7 @@ export const ModeratorProjectsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isForbidden, setIsForbidden] = useState<boolean>(false);
+  const [forbiddenMessage, setForbiddenMessage] = useState<string | null>(null);
 
   // Chi tiết dự án đang xem (bảng bên / drawer)
   const [selectedItem, setSelectedItem] = useState<PendingProjectModerationItem | null>(null);
@@ -56,6 +56,7 @@ export const ModeratorProjectsPage: React.FC = () => {
   } | null>(null);
   const [reviewNote, setReviewNote] = useState<string>('');
   const [noteValidationError, setNoteValidationError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Thông báo kết quả thao tác (Banner)
@@ -82,17 +83,18 @@ export const ModeratorProjectsPage: React.FC = () => {
   };
 
   // Lấy tên người gửi an toàn (ưu tiên fullName, nếu không dùng nickname)
-  const getSenderName = (creator?: { fullName?: string; nickname?: string } | null): string => {
+  const getSenderName = (
+    creator?: { fullName?: string | null; nickname?: string | null } | null
+  ): string => {
     const raw = creator?.fullName?.trim() || creator?.nickname?.trim();
     return raw ? sanitizeDisplayText(raw) : 'Người dùng';
   };
 
-  // Kiểm tra quyền project.review
+  // Kiểm tra quyền project.review cho cả Admin và Moderator khi capabilities đã tải
   const isForbiddenByCapabilities =
     !access.loading &&
     access.capabilities !== null &&
-    !access.has('project.review') &&
-    currentUser?.role !== 'admin';
+    !access.has('project.review');
 
   const showForbidden = isForbidden || isForbiddenByCapabilities;
 
@@ -103,6 +105,7 @@ export const ModeratorProjectsPage: React.FC = () => {
     }
 
     let ignore = false;
+    let redirected = false;
     const controller = new AbortController();
 
     async function loadData() {
@@ -117,12 +120,14 @@ export const ModeratorProjectsPage: React.FC = () => {
 
         // Trường hợp trang hiện tại vượt quá tổng số trang mới
         if (response.totalPages > 0 && currentPage > response.totalPages) {
+          redirected = true;
           setCurrentPage(response.totalPages);
           return;
         }
 
-        // Trường hợp danh sách rỗng nhưng đang ở trang > 1
-        if (response.totalItems === 0 && currentPage > 1) {
+        // Trường hợp hàng đợi trống hoặc không còn dữ liệu ở trang > 1
+        if ((response.totalItems === 0 || response.totalPages === 0) && currentPage > 1) {
+          redirected = true;
           setCurrentPage(1);
           return;
         }
@@ -130,27 +135,32 @@ export const ModeratorProjectsPage: React.FC = () => {
         setData(response);
         setLoadError(null);
         setIsForbidden(false);
+        setForbiddenMessage(null);
       } catch (err: unknown) {
         if (ignore || controller.signal.aborted) return;
 
-        if (axios.isAxiosError(err)) {
-          if (err.response?.status === 403) {
-            setIsForbidden(true);
-            setLoadError('Tài khoản không có quyền kiểm duyệt dự án (project.review).');
+        const bizErr = projectModerationService.extractBusinessError(err);
+
+        if (bizErr.status === 400 && bizErr.code === 'INVALID_PAGINATION') {
+          if (currentPage > 1) {
+            redirected = true;
+            setCurrentPage(1);
             return;
           }
-          if (err.response?.status === 401) {
-            setLoadError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-            return;
-          }
-          if (err.code === 'ECONNABORTED' || !err.response) {
-            setLoadError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền mạng.');
-            return;
-          }
+          setLoadError(bizErr.message);
+          return;
         }
-        setLoadError('Không thể tải danh sách dự án chờ kiểm duyệt. Vui lòng thử lại sau.');
+
+        if (bizErr.status === 403) {
+          setIsForbidden(true);
+          setForbiddenMessage(bizErr.code === 'PROFILE_NOT_FOUND' ? bizErr.message : null);
+          setLoadError(bizErr.message);
+          return;
+        }
+
+        setLoadError(bizErr.message);
       } finally {
-        if (!ignore && !controller.signal.aborted) {
+        if (!ignore && !controller.signal.aborted && !redirected) {
           setIsLoading(false);
         }
       }
@@ -172,8 +182,9 @@ export const ModeratorProjectsPage: React.FC = () => {
 
   // Chuyển trang
   const handlePageChange = useCallback((newPage: number) => {
+    const safePage = Math.max(1, Math.floor(newPage));
     setIsLoading(true);
-    setCurrentPage(newPage);
+    setCurrentPage(safePage);
   }, []);
 
   // Mở drawer xem chi tiết
@@ -194,6 +205,7 @@ export const ModeratorProjectsPage: React.FC = () => {
   const closeConfirmModal = useCallback(() => {
     setConfirmModal(null);
     setNoteValidationError(null);
+    setModalError(null);
     if (lastTriggerRef.current) {
       lastTriggerRef.current.focus();
     }
@@ -208,8 +220,12 @@ export const ModeratorProjectsPage: React.FC = () => {
     lastTriggerRef.current = triggerElement;
     setConfirmModal({ action, item });
     setNoteValidationError(null);
-    // Giữ nguyên reviewNote nếu có thể thử lại, nếu đổi dự án thì làm mới
-    if (!confirmModal || confirmModal.item.project.id !== item.project.id) {
+    setModalError(null);
+    if (
+      !confirmModal ||
+      confirmModal.item.project.id !== item.project.id ||
+      confirmModal.action !== action
+    ) {
       setReviewNote('');
     }
   };
@@ -248,7 +264,7 @@ export const ModeratorProjectsPage: React.FC = () => {
     const projectTitle = sanitizeDisplayText(item.project.title);
     const trimmedNote = reviewNote.trim();
 
-    // Kiểm tra tính hợp lệ của lý do từ chối
+    // Chặn lý do chỉ có khoảng trắng trước khi POST
     if (action === 'reject' && !trimmedNote) {
       setNoteValidationError('Vui lòng nhập lý do từ chối dự án.');
       modalTextareaRef.current?.focus();
@@ -257,6 +273,7 @@ export const ModeratorProjectsPage: React.FC = () => {
 
     setIsSubmitting(true);
     setNoteValidationError(null);
+    setModalError(null);
 
     try {
       if (action === 'approve') {
@@ -265,7 +282,7 @@ export const ModeratorProjectsPage: React.FC = () => {
         await projectModerationService.rejectProject(item.project.id, trimmedNote);
       }
 
-      // Xử lý thành công
+      // Thành công: báo kết quả, đóng modal và drawer, tải lại danh sách
       closeConfirmModal();
       setSelectedItem(null);
       setReviewNote('');
@@ -277,56 +294,45 @@ export const ModeratorProjectsPage: React.FC = () => {
             : `Đã từ chối dự án "${projectTitle}" thành công.`,
       });
 
-      // Kích hoạt tải lại hàng đợi
       handleRefresh();
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        const status = err.response?.status;
+      const bizErr = projectModerationService.extractBusinessError(err);
 
-        if (status === 401) {
-          setFeedback({
-            type: 'error',
-            message: 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.',
-          });
-          return;
-        }
-
-        if (status === 403) {
-          setFeedback({
-            type: 'error',
-            message: 'Bạn không có quyền thực hiện thao tác kiểm duyệt dự án (project.review).',
-          });
-          return;
-        }
-
-        // Trường hợp 404 hoặc 409 (đã được người khác xử lý hoặc không còn ReviewRequired)
-        if (status === 404 || status === 409) {
-          closeConfirmModal();
-          setSelectedItem(null);
-          setFeedback({
-            type: 'warning',
-            message: `Hồ sơ kiểm duyệt của dự án "${projectTitle}" đã được người khác xử lý hoặc đã thay đổi trạng thái. Danh sách đã được làm mới.`,
-          });
-          handleRefresh();
-          return;
-        }
-
-        // Lỗi mạng hoặc hết thời gian chờ
-        if (err.code === 'ECONNABORTED' || !err.response) {
-          setFeedback({
-            type: 'warning',
-            message:
-              'Không thể kết nối đến máy chủ hoặc yêu cầu quá thời gian phản hồi. Quyết định có thể đã được tiếp nhận, vui lòng kiểm tra lại hàng đợi.',
-          });
-          return;
-        }
+      // 400 REVIEW_NOTE_REQUIRED -> báo lỗi tại ô lý do
+      if (bizErr.status === 400 && (bizErr.code === 'REVIEW_NOTE_REQUIRED' || action === 'reject')) {
+        setNoteValidationError(bizErr.message);
+        modalTextareaRef.current?.focus();
+        return;
       }
 
-      // Lỗi chung khác: giữ nguyên ghi chú đã nhập để người dùng không bị mất nội dung
-      setFeedback({
-        type: 'error',
-        message: 'Đã có lỗi xảy ra khi gửi quyết định kiểm duyệt. Vui lòng thử lại.',
-      });
+      // 404 PROJECT_NOT_FOUND hoặc 409 INVALID_MODERATION_STATE -> đóng chi tiết cũ, báo trạng thái và tải lại danh sách
+      if (bizErr.status === 404 || bizErr.status === 409) {
+        closeConfirmModal();
+        setSelectedItem(null);
+        setReviewNote('');
+        setFeedback({
+          type: 'warning',
+          message:
+            bizErr.status === 404 || bizErr.code === 'PROJECT_NOT_FOUND'
+              ? `Dự án "${projectTitle}" không còn khả dụng để kiểm duyệt. Danh sách đã được làm mới.`
+              : `Hồ sơ kiểm duyệt của dự án "${projectTitle}" đã được xử lý hoặc đã thay đổi trạng thái. Danh sách đã được làm mới.`,
+        });
+        handleRefresh();
+        return;
+      }
+
+      // 403 FORBIDDEN / PROFILE_NOT_FOUND -> báo thiếu quyền hoặc thiếu hồ sơ người dùng, giữ nội dung đã nhập
+      if (bizErr.status === 403) {
+        setModalError(bizErr.message);
+        setFeedback({
+          type: 'error',
+          message: bizErr.message,
+        });
+        return;
+      }
+
+      // 401 hoặc lỗi mạng / server -> giữ nguyên nội dung đã nhập để không mất ghi chú
+      setModalError(bizErr.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -353,7 +359,7 @@ export const ModeratorProjectsPage: React.FC = () => {
     );
   };
 
-  // Nếu người dùng không có quyền (403)
+  // Nếu người dùng không có quyền (403) hoặc thiếu hồ sơ xử lý (PROFILE_NOT_FOUND)
   if (showForbidden) {
     return (
       <div className="space-y-6">
@@ -368,13 +374,21 @@ export const ModeratorProjectsPage: React.FC = () => {
           <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-100">
             <ShieldAlert className="w-7 h-7" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Không có quyền truy cập</h2>
-          <p className="text-sm text-slate-600 mt-2">
-            Tài khoản của bạn không có quyền kiểm duyệt dự án (<code className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">project.review</code>).
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            Vui lòng liên hệ với Quản trị viên hệ thống để được phân quyền phù hợp.
-          </p>
+          <h2 className="text-lg font-bold text-slate-900">
+            {forbiddenMessage ? 'Không thể thực hiện kiểm duyệt' : 'Không có quyền truy cập'}
+          </h2>
+          {forbiddenMessage ? (
+            <p className="text-sm text-slate-600 mt-2">{forbiddenMessage}</p>
+          ) : (
+            <>
+              <p className="text-sm text-slate-600 mt-2">
+                Tài khoản của bạn không có quyền kiểm duyệt dự án (<code className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">project.review</code>).
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Vui lòng liên hệ với Quản trị viên hệ thống để được phân quyền phù hợp.
+              </p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -518,8 +532,8 @@ export const ModeratorProjectsPage: React.FC = () => {
                         </td>
                         <td className="p-4">
                           <div className="flex flex-col gap-1.5 items-start">
-                            {renderCheckResultBadge('Nội dung', item.moderation.contentResult)}
-                            {renderCheckResultBadge('Liên kết', item.moderation.linkResult)}
+                            {renderCheckResultBadge('Nội dung', item.moderation?.contentResult)}
+                            {renderCheckResultBadge('Liên kết', item.moderation?.linkResult)}
                           </div>
                         </td>
                         <td className="p-4 text-right whitespace-nowrap">
@@ -576,8 +590,8 @@ export const ModeratorProjectsPage: React.FC = () => {
 
                   <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap gap-1.5">
-                      {renderCheckResultBadge('Nội dung', item.moderation.contentResult)}
-                      {renderCheckResultBadge('Liên kết', item.moderation.linkResult)}
+                      {renderCheckResultBadge('Nội dung', item.moderation?.contentResult)}
+                      {renderCheckResultBadge('Liên kết', item.moderation?.linkResult)}
                     </div>
                     <button
                       type="button"
@@ -647,10 +661,23 @@ export const ModeratorProjectsPage: React.FC = () => {
               {/* Drawer Header */}
               <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4 bg-slate-50/50">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                       {sanitizeDisplayText(selectedItem.project.projectField) || 'Chưa phân loại'}
                     </span>
+                    {selectedItem.project.status !== null && selectedItem.project.status !== undefined && (
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                          selectedItem.project.status === ProjectHubStatus.Active
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : selectedItem.project.status === ProjectHubStatus.Rejected
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {getProjectHubStatusLabel(selectedItem.project.status)}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-400">
                       Gửi lúc: {formatDateTime(selectedItem.submittedAt)}
                     </span>
@@ -680,7 +707,7 @@ export const ModeratorProjectsPage: React.FC = () => {
                   <div className="font-semibold text-slate-900 text-sm">
                     {getSenderName(selectedItem.project.creator)}
                   </div>
-                  {selectedItem.project.creator.nickname && (
+                  {selectedItem.project.creator?.nickname && (
                     <div className="text-slate-500">
                       Biệt danh: <span className="font-medium text-slate-700">{sanitizeDisplayText(selectedItem.project.creator.nickname)}</span>
                     </div>
@@ -702,22 +729,26 @@ export const ModeratorProjectsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1">
                       <div className="text-[11px] text-slate-500 font-medium">Kiểm tra nội dung</div>
-                      <div>{renderCheckResultBadge('Nội dung', selectedItem.moderation.contentResult)}</div>
+                      <div>{renderCheckResultBadge('Nội dung', selectedItem.moderation?.contentResult)}</div>
                     </div>
 
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1">
                       <div className="text-[11px] text-slate-500 font-medium">Kiểm tra liên kết</div>
-                      <div>{renderCheckResultBadge('Liên kết', selectedItem.moderation.linkResult)}</div>
+                      <div>{renderCheckResultBadge('Liên kết', selectedItem.moderation?.linkResult)}</div>
                     </div>
                   </div>
 
-                  {selectedItem.moderation.confidence !== null && selectedItem.moderation.confidence !== undefined && (
-                    <div className="text-slate-500 text-xs">
-                      Độ tin cậy tự động: <span className="font-semibold text-slate-800">{Math.round(selectedItem.moderation.confidence * 100)}%</span>
-                    </div>
-                  )}
+                  <div className="text-slate-500 text-xs">
+                    Độ tin cậy tự động:{' '}
+                    <span className="font-semibold text-slate-800">
+                      {typeof selectedItem.moderation?.confidence === 'number' &&
+                      !Number.isNaN(selectedItem.moderation.confidence)
+                        ? `${Math.round(selectedItem.moderation.confidence * 100)}%`
+                        : 'Chưa có'}
+                    </span>
+                  </div>
 
-                  {selectedItem.moderation.violationReason && (
+                  {selectedItem.moderation?.violationReason && (
                     <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
                       <div className="font-bold flex items-center gap-1.5 text-amber-800">
                         <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -751,7 +782,7 @@ export const ModeratorProjectsPage: React.FC = () => {
                     <div className="flex flex-wrap gap-1.5">
                       {selectedItem.project.skills.map((skill) => (
                         <span
-                          key={skill.skillName}
+                          key={skill.skillId || skill.skillName}
                           className="px-2.5 py-1 bg-white text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-2xs"
                         >
                           {sanitizeDisplayText(skill.skillName)}
@@ -771,7 +802,7 @@ export const ModeratorProjectsPage: React.FC = () => {
                     <div className="space-y-2">
                       {selectedItem.project.roleRequirements.map((role) => (
                         <div
-                          key={role.roleName}
+                          key={role.id || role.roleName}
                           className="p-3 bg-white border border-slate-200 rounded-xl space-y-1 shadow-2xs"
                         >
                           <div className="flex items-center justify-between">
@@ -907,6 +938,7 @@ export const ModeratorProjectsPage: React.FC = () => {
                   onChange={(e) => {
                     setReviewNote(e.target.value);
                     if (noteValidationError) setNoteValidationError(null);
+                    if (modalError) setModalError(null);
                   }}
                   disabled={isSubmitting}
                   placeholder={
@@ -928,6 +960,16 @@ export const ModeratorProjectsPage: React.FC = () => {
                 )}
               </div>
 
+              {modalError && (
+                <div
+                  role="alert"
+                  className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-medium text-rose-700 flex items-start gap-2"
+                >
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               {/* Nút hành động */}
               <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
@@ -941,12 +983,12 @@ export const ModeratorProjectsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void handleSubmitDecision()}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || (confirmModal.action === 'reject' && !reviewNote.trim())}
                   className={`px-4 py-2 text-white text-xs font-semibold rounded-xl shadow-xs transition inline-flex items-center gap-2 ${
                     confirmModal.action === 'approve'
                       ? 'bg-emerald-600 hover:bg-emerald-700'
                       : 'bg-rose-600 hover:bg-rose-700'
-                  } disabled:opacity-50`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {isSubmitting ? (
                     <>
