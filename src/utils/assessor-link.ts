@@ -1,9 +1,10 @@
 /**
  * Utility to format and normalize the assessor onboarding profile link.
- * Ensures the link strictly conforms to: https://uninet-be.onrender.com/assessor-onboarding/profile.html#token=...
+ * Ensures the link strictly conforms to: https://uninet-backend-api.bravemoss-bc939933.southeastasia.azurecontainerapps.io/assessor-onboarding/profile.html#token=...
  * and eliminates duplicate/redundant path segments such as assess-onboarding or assessor-boarding.
  */
-export const ASSESSOR_ONBOARDING_BASE_URL = 'https://uninet-be.onrender.com';
+export const ASSESSOR_ONBOARDING_BASE_URL =
+  'https://uninet-backend-api.bravemoss-bc939933.southeastasia.azurecontainerapps.io';
 
 export const formatAssessorOnboardingLink = (rawLink: string | null | undefined): string => {
   if (!rawLink || !rawLink.trim()) {
